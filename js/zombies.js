@@ -18,6 +18,8 @@ class Zombie {
     this.slowTimer = 0;
     this.slowFactor = 1;
     this.isAlly = false; // 被魅惑后为true，向左走并攻击植物
+    this.hasTakenHit = false;   // 读报僵尸是否已被首次命中
+    this.isVaulting = false;    // 撑杆僵尸跳跃标志
 
     // 动画
     this.animTime = Math.random() * 1000;
@@ -59,7 +61,14 @@ class Zombie {
       // 检查前方是否有植物阻挡（友军僵尸不攻击植物）
       const plant = game.getPlantAt(this.row, this.x);
       if (plant) {
-        // 魅惑菇：僵尸接触到即触发魅惑，蘑菇消失
+        // 撑杆僵尸：跳跃越过第一排植物（不啃食）
+        if (this.type.jumpOverPlant && !this.isVaulting) {
+          this.isVaulting = true;
+          this.x -= (plant.x - this.x + 40) + 60; // 越过并继续前进
+          this.isVaulting = false;
+          this.walkPhase += dt / 50; // 跳跃动画加速
+          return;
+        }
         if (plant.type.behavior === 'charm') {
           plant.alive = false;
           this.isAlly = true;
@@ -103,6 +112,11 @@ class Zombie {
 
   takeDamage(dmg) {
     this.hp -= dmg;
+    // 读报僵尸：首次被命中后丢报纸加速
+    if (this.type.newspaperBehavior && !this.hasTakenHit) {
+      this.hasTakenHit = true;
+      this.speed = this.type.speedAfterHit;
+    }
     if (this.hp <= 0 && !this.dead) {
       this.dead = true;
       this.deathTimer = 0;
@@ -261,6 +275,51 @@ class Zombie {
       ctx.quadraticCurveTo(x, y - 42, x + 10, y - 30);
       ctx.closePath();
       ctx.fill();
+    }
+
+    // 铁桶僵尸（灰色铁桶罩头）
+    if (this.typeId === 'bucket') {
+      ctx.fillStyle = '#9e9e9e';
+      ctx.beginPath();
+      ctx.ellipse(x, y - 28, 13, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#757575';
+      ctx.fillRect(x - 13, y - 30, 26, 4);
+      ctx.fillStyle = '#bdbdbd';
+      ctx.fillRect(x - 2, y - 34, 4, 12); // 桶上高光
+    }
+
+    // 撑杆僵尸（橙色运动装+撑杆）
+    if (this.typeId === 'poleVault') {
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath();
+      ctx.ellipse(x, y + 4, 13, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 撑杆
+      ctx.strokeStyle = '#616161';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + 10, y - 30);
+      ctx.lineTo(x + 22, y + 28);
+      ctx.stroke();
+    }
+
+    // 读报僵尸（报纸遮脸）
+    if (this.typeId === 'newspaper') {
+      if (!this.hasTakenHit) {
+        ctx.fillStyle = '#fff8e1';
+        ctx.fillRect(x + 2, y - 30, 14, 18);
+        ctx.strokeStyle = '#9e9e9e';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 2, y - 30, 14, 18);
+        // 报纸文字线
+        ctx.strokeStyle = '#616161';
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y - 26); ctx.lineTo(x + 14, y - 26);
+        ctx.moveTo(x + 4, y - 22); ctx.lineTo(x + 14, y - 22);
+        ctx.moveTo(x + 4, y - 18); ctx.lineTo(x + 14, y - 18);
+        ctx.stroke();
+      }
     }
   }
 }
