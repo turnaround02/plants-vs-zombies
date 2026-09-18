@@ -1,0 +1,14 @@
+{
+  "name": "plants-vs-zombies",
+  "version": "1.0.0",
+  "description": "植物大战僵尸塔防游戏",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8080",
+    "test": "node test/headless-test.js",
+    "docker": "docker-compose up -d"
+  },
+  "devDependencies": {
+    "puppeteer": "^22.0.0"
+  }
+}

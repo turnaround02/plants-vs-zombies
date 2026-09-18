@@ -1,0 +1,573 @@
+// ============================================================
+// 游戏全局配置
+// ============================================================
+const CONFIG = {
+  // 画布尺寸
+  CANVAS_WIDTH: 960,
+  CANVAS_HEIGHT: 600,
+
+  // 网格布局: 5行 x 9列
+  ROWS: 5,
+  COLS: 9,
+  CELL_WIDTH: 100,
+  CELL_HEIGHT: 120,
+  GRID_OFFSET_X: 60,   // 留出房屋空间
+  GRID_OFFSET_Y: 0,
+
+  // 阳光系统
+  START_SUN: 150,
+  SUN_FALL_INTERVAL: 7000,      // 天空掉阳光间隔(ms)
+  SUN_FALL_AMOUNT: 25,
+  SUN_LIFETIME: 12000,          // 阳光存在时间(ms)
+  SUN_COLLECT_RADIUS: 35,
+
+  // 游戏节奏
+  ZOMBIE_SPAWN_INTERVAL: 8000,  // 波次内僵尸生成间隔(ms)
+  WAVE_BREAK_INTERVAL: 10000,   // 波次间隔(ms)
+
+  // 房屋位置(僵尸到达即失败)
+  HOUSE_X: 60,
+
+  // 僵尸生成位置
+  ZOMBIE_SPAWN_X: 1010,
+
+  // 植物放置
+  PLANT_PLACE_COOLDOWN: 5000,   // 放置后冷却(ms)
+
+  // 渲染
+  FONT_FAMILY: "'Segoe UI', 'Microsoft YaHei', Arial, sans-serif",
+};
+
+// ============================================================
+// 植物定义
+// ============================================================
+const PLANT_TYPES = {
+  sunflower: {
+    id: 'sunflower',
+    name: '向日葵',
+    icon: '🌻',
+    cost: 50,
+    hp: 80,
+    cooldown: 5000,
+    color: '#ffd700',
+    description: '生产阳光',
+    behavior: 'sunProducer',
+    sunInterval: 9000,
+    sunAmount: 25,
+  },
+  peashooter: {
+    id: 'peashooter',
+    name: '豌豆射手',
+    icon: '🌱',
+    cost: 100,
+    hp: 100,
+    cooldown: 5000,
+    color: '#4caf50',
+    description: '发射豌豆',
+    behavior: 'shooter',
+    damage: 20,
+    fireInterval: 1400,
+    range: 400,
+    projectileSpeed: 300,
+  },
+  snowpea: {
+    id: 'snowpea',
+    name: '寒冰射手',
+    icon: '❄️',
+    cost: 175,
+    hp: 100,
+    cooldown: 7000,
+    color: '#4fc3f7',
+    description: '发射冰冻豌豆',
+    behavior: 'shooter',
+    damage: 20,
+    fireInterval: 1400,
+    range: 400,
+    projectileSpeed: 300,
+    slowFactor: 0.5,
+    slowDuration: 3000,
+  },
+  wallnut: {
+    id: 'wallnut',
+    name: '坚果墙',
+    icon: '🥜',
+    cost: 50,
+    hp: 400,
+    cooldown: 10000,
+    color: '#a1887f',
+    description: '高耐久屏障',
+    behavior: 'wall',
+  },
+  cherrybomb: {
+    id: 'cherrybomb',
+    name: '樱桃炸弹',
+    icon: '🍒',
+    cost: 150,
+    hp: 100,
+    cooldown: 15000,
+    color: '#f44336',
+    description: '爆炸范围伤害',
+    behavior: 'bomb',
+    damage: 180,
+    blastRadius: 120,
+    fuseTime: 1000,
+  },
+  repeater: {
+    id: 'repeater',
+    name: '双发豌豆',
+    icon: '🔫',
+    cost: 200,
+    hp: 100,
+    cooldown: 7000,
+    color: '#66bb6a',
+    description: '一次发射两颗豌豆',
+    behavior: 'shooter',
+    damage: 20,
+    fireInterval: 1400,
+    range: 400,
+    projectileSpeed: 300,
+    shotsPerFire: 2,
+  },
+  catTail: {
+    id: 'catTail',
+    name: '猫尾草',
+    icon: '🌿',
+    cost: 25,
+    hp: 60,
+    cooldown: 3000,
+    color: '#9c27b0',
+    description: '穿透子弹，攻击多个僵尸',
+    behavior: 'shooter',
+    damage: 15,
+    fireInterval: 1800,
+    range: 400,
+    projectileSpeed: 300,
+    penetrate: true,
+  },
+  chaosShroom: {
+    id: 'chaosShroom',
+    name: '魅惑菇',
+    icon: '🍄',
+    cost: 25,
+    hp: 30,
+    cooldown: 5000,
+    color: '#9c27b0',
+    description: '接触僵尸即魅惑，随后消失',
+    behavior: 'charm',
+  },
+};
+
+// ============================================================
+// 僵尸定义
+// ============================================================
+const ZOMBIE_TYPES = {
+  normal: {
+    id: 'normal',
+    name: '普通僵尸',
+    icon: '🧟',
+    hp: 100,
+    speed: 20,          // px/s
+    damage: 10,         // 啃咬伤害
+    attackInterval: 800, // 啃咬间隔(ms)
+    color: '#7cb342',
+    score: 10,
+  },
+  cone: {
+    id: 'cone',
+    name: '路障僵尸',
+    icon: '🧟‍♂️',
+    hp: 200,
+    speed: 18,
+    damage: 12,
+    attackInterval: 800,
+    color: '#ef6c00',
+    score: 20,
+  },
+  runner: {
+    id: 'runner',
+    name: '奔跑僵尸',
+    icon: '🏃',
+    hp: 80,
+    speed: 42,
+    damage: 8,
+    attackInterval: 600,
+    color: '#e53935',
+    score: 15,
+  },
+};
+
+// ============================================================
+// 关卡定义
+// ============================================================
+const LEVELS = {
+  1: {
+    id: 1,
+    name: '第一关：初战',
+    startSun: 150,
+    waves: [
+      {
+        // 第1波: 3个普通僵尸
+        zombies: [
+          { type: 'normal', delay: 0 },
+          { type: 'normal', delay: 4000 },
+          { type: 'normal', delay: 8000 },
+        ],
+      },
+      {
+        // 第2波: 4个普通僵尸 + 1个路障
+        zombies: [
+          { type: 'normal', delay: 0 },
+          { type: 'normal', delay: 3000 },
+          { type: 'cone', delay: 6000 },
+          { type: 'normal', delay: 9000 },
+          { type: 'normal', delay: 12000 },
+        ],
+      },
+      {
+        // 第3波: 2个奔跑僵尸 + 3个普通
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'normal', delay: 3000 },
+          { type: 'runner', delay: 6000 },
+          { type: 'normal', delay: 9000 },
+          { type: 'normal', delay: 12000 },
+        ],
+      },
+      {
+        // 第4波: 混合大军
+        zombies: [
+          { type: 'normal', delay: 0 },
+          { type: 'cone', delay: 3000 },
+          { type: 'runner', delay: 6000 },
+          { type: 'normal', delay: 9000 },
+          { type: 'cone', delay: 12000 },
+          { type: 'runner', delay: 15000 },
+        ],
+      },
+      {
+        // 第5波: 最终波
+        zombies: [
+          { type: 'normal', delay: 0 },
+          { type: 'cone', delay: 2500 },
+          { type: 'runner', delay: 5000 },
+          { type: 'normal', delay: 7500 },
+          { type: 'cone', delay: 10000 },
+          { type: 'runner', delay: 12500 },
+          { type: 'normal', delay: 15000 },
+          { type: 'cone', delay: 17500 },
+        ],
+      },
+    ],
+  },
+  2: {
+    id: 2,
+    name: '第二关：集结',
+    startSun: 175,
+    waves: [
+      {
+        zombies: [
+          { type: 'normal', delay: 0 },
+          { type: 'normal', delay: 2500 },
+          { type: 'normal', delay: 5000 },
+          { type: 'cone', delay: 7500 },
+          { type: 'normal', delay: 10000 },
+          { type: 'cone', delay: 12500 },
+          { type: 'runner', delay: 15000 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'normal', delay: 0 },
+          { type: 'cone', delay: 2000 },
+          { type: 'runner', delay: 4000 },
+          { type: 'normal', delay: 6000 },
+          { type: 'cone', delay: 8000 },
+          { type: 'runner', delay: 10000 },
+          { type: 'normal', delay: 12000 },
+          { type: 'runner', delay: 14000 },
+          { type: 'cone', delay: 16000 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'runner', delay: 2000 },
+          { type: 'normal', delay: 4000 },
+          { type: 'cone', delay: 6000 },
+          { type: 'runner', delay: 8000 },
+          { type: 'normal', delay: 10000 },
+          { type: 'cone', delay: 12000 },
+          { type: 'runner', delay: 14000 },
+          { type: 'normal', delay: 16000 },
+          { type: 'cone', delay: 18000 },
+        ],
+      },
+    ],
+  },
+  3: {
+    id: 3,
+    name: '第三关：疾驰',
+    startSun: 200,
+    waves: [
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'runner', delay: 1500 },
+          { type: 'normal', delay: 3000 },
+          { type: 'runner', delay: 4500 },
+          { type: 'runner', delay: 6000 },
+          { type: 'cone', delay: 7500 },
+          { type: 'runner', delay: 9000 },
+          { type: 'normal', delay: 10500 },
+          { type: 'runner', delay: 12000 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'cone', delay: 0 },
+          { type: 'runner', delay: 1500 },
+          { type: 'cone', delay: 3000 },
+          { type: 'runner', delay: 4500 },
+          { type: 'normal', delay: 6000 },
+          { type: 'runner', delay: 7500 },
+          { type: 'cone', delay: 9000 },
+          { type: 'runner', delay: 10500 },
+          { type: 'runner', delay: 12000 },
+          { type: 'cone', delay: 13500 },
+          { type: 'normal', delay: 15000 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'runner', delay: 1000 },
+          { type: 'runner', delay: 2000 },
+          { type: 'cone', delay: 3000 },
+          { type: 'runner', delay: 4000 },
+          { type: 'runner', delay: 5000 },
+          { type: 'normal', delay: 6000 },
+          { type: 'runner', delay: 7000 },
+          { type: 'cone', delay: 8000 },
+          { type: 'runner', delay: 9000 },
+          { type: 'runner', delay: 10000 },
+          { type: 'normal', delay: 11000 },
+          { type: 'runner', delay: 12000 },
+          { type: 'cone', delay: 13000 },
+        ],
+      },
+    ],
+  },
+  4: {
+    id: 4,
+    name: '第四关：铁桶',
+    startSun: 225,
+    waves: [
+      {
+        zombies: [
+          { type: 'cone', delay: 0 },
+          { type: 'cone', delay: 2000 },
+          { type: 'normal', delay: 4000 },
+          { type: 'cone', delay: 6000 },
+          { type: 'normal', delay: 8000 },
+          { type: 'cone', delay: 10000 },
+          { type: 'runner', delay: 12000 },
+          { type: 'cone', delay: 14000 },
+          { type: 'normal', delay: 16000 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'cone', delay: 0 },
+          { type: 'runner', delay: 1500 },
+          { type: 'cone', delay: 3000 },
+          { type: 'cone', delay: 4500 },
+          { type: 'runner', delay: 6000 },
+          { type: 'normal', delay: 7500 },
+          { type: 'cone', delay: 9000 },
+          { type: 'runner', delay: 10500 },
+          { type: 'cone', delay: 12000 },
+          { type: 'runner', delay: 13500 },
+          { type: 'normal', delay: 15000 },
+          { type: 'cone', delay: 16500 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'cone', delay: 1000 },
+          { type: 'runner', delay: 2000 },
+          { type: 'cone', delay: 3000 },
+          { type: 'runner', delay: 4000 },
+          { type: 'cone', delay: 5000 },
+          { type: 'normal', delay: 6000 },
+          { type: 'runner', delay: 7000 },
+          { type: 'cone', delay: 8000 },
+          { type: 'runner', delay: 9000 },
+          { type: 'cone', delay: 10000 },
+          { type: 'runner', delay: 11000 },
+          { type: 'normal', delay: 12000 },
+          { type: 'cone', delay: 13000 },
+          { type: 'runner', delay: 14000 },
+          { type: 'cone', delay: 15000 },
+        ],
+      },
+    ],
+  },
+  5: {
+    id: 5,
+    name: '第五关：狂潮',
+    startSun: 250,
+    waves: [
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'runner', delay: 800 },
+          { type: 'cone', delay: 1600 },
+          { type: 'runner', delay: 2400 },
+          { type: 'normal', delay: 3200 },
+          { type: 'runner', delay: 4000 },
+          { type: 'cone', delay: 4800 },
+          { type: 'runner', delay: 5600 },
+          { type: 'normal', delay: 6400 },
+          { type: 'cone', delay: 7200 },
+          { type: 'runner', delay: 8000 },
+          { type: 'runner', delay: 8800 },
+          { type: 'normal', delay: 9600 },
+          { type: 'cone', delay: 10400 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'cone', delay: 0 },
+          { type: 'runner', delay: 700 },
+          { type: 'cone', delay: 1400 },
+          { type: 'runner', delay: 2100 },
+          { type: 'normal', delay: 2800 },
+          { type: 'runner', delay: 3500 },
+          { type: 'cone', delay: 4200 },
+          { type: 'runner', delay: 4900 },
+          { type: 'cone', delay: 5600 },
+          { type: 'normal', delay: 6300 },
+          { type: 'runner', delay: 7000 },
+          { type: 'cone', delay: 7700 },
+          { type: 'runner', delay: 8400 },
+          { type: 'runner', delay: 9100 },
+          { type: 'cone', delay: 9800 },
+          { type: 'normal', delay: 10500 },
+          { type: 'runner', delay: 11200 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'runner', delay: 500 },
+          { type: 'cone', delay: 1000 },
+          { type: 'runner', delay: 1500 },
+          { type: 'runner', delay: 2000 },
+          { type: 'cone', delay: 2500 },
+          { type: 'normal', delay: 3000 },
+          { type: 'runner', delay: 3500 },
+          { type: 'cone', delay: 4000 },
+          { type: 'runner', delay: 4500 },
+          { type: 'runner', delay: 5000 },
+          { type: 'cone', delay: 5500 },
+          { type: 'normal', delay: 6000 },
+          { type: 'runner', delay: 6500 },
+          { type: 'cone', delay: 7000 },
+          { type: 'runner', delay: 7500 },
+          { type: 'runner', delay: 8000 },
+          { type: 'cone', delay: 8500 },
+          { type: 'normal', delay: 9000 },
+          { type: 'runner', delay: 9500 },
+        ],
+      },
+    ],
+  },
+  6: {
+    id: 6,
+    name: '第六关：最终防线',
+    startSun: 275,
+    waves: [
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'cone', delay: 600 },
+          { type: 'runner', delay: 1200 },
+          { type: 'runner', delay: 1800 },
+          { type: 'cone', delay: 2400 },
+          { type: 'normal', delay: 3000 },
+          { type: 'runner', delay: 3600 },
+          { type: 'cone', delay: 4200 },
+          { type: 'runner', delay: 4800 },
+          { type: 'normal', delay: 5400 },
+          { type: 'cone', delay: 6000 },
+          { type: 'runner', delay: 6600 },
+          { type: 'runner', delay: 7200 },
+          { type: 'cone', delay: 7800 },
+          { type: 'normal', delay: 8400 },
+          { type: 'runner', delay: 9000 },
+          { type: 'cone', delay: 9600 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'runner', delay: 400 },
+          { type: 'cone', delay: 800 },
+          { type: 'runner', delay: 1200 },
+          { type: 'runner', delay: 1600 },
+          { type: 'cone', delay: 2000 },
+          { type: 'normal', delay: 2400 },
+          { type: 'runner', delay: 2800 },
+          { type: 'cone', delay: 3200 },
+          { type: 'runner', delay: 3600 },
+          { type: 'runner', delay: 4000 },
+          { type: 'cone', delay: 4400 },
+          { type: 'normal', delay: 4800 },
+          { type: 'runner', delay: 5200 },
+          { type: 'cone', delay: 5600 },
+          { type: 'runner', delay: 6000 },
+          { type: 'runner', delay: 6400 },
+          { type: 'cone', delay: 6800 },
+          { type: 'normal', delay: 7200 },
+          { type: 'runner', delay: 7600 },
+          { type: 'cone', delay: 8000 },
+          { type: 'runner', delay: 8400 },
+        ],
+      },
+      {
+        zombies: [
+          { type: 'runner', delay: 0 },
+          { type: 'runner', delay: 300 },
+          { type: 'cone', delay: 600 },
+          { type: 'runner', delay: 900 },
+          { type: 'runner', delay: 1200 },
+          { type: 'cone', delay: 1500 },
+          { type: 'runner', delay: 1800 },
+          { type: 'normal', delay: 2100 },
+          { type: 'runner', delay: 2400 },
+          { type: 'cone', delay: 2700 },
+          { type: 'runner', delay: 3000 },
+          { type: 'runner', delay: 3300 },
+          { type: 'cone', delay: 3600 },
+          { type: 'normal', delay: 3900 },
+          { type: 'runner', delay: 4200 },
+          { type: 'cone', delay: 4500 },
+          { type: 'runner', delay: 4800 },
+          { type: 'runner', delay: 5100 },
+          { type: 'cone', delay: 5400 },
+          { type: 'normal', delay: 5700 },
+          { type: 'runner', delay: 6000 },
+          { type: 'cone', delay: 6300 },
+          { type: 'runner', delay: 6600 },
+          { type: 'runner', delay: 6900 },
+          { type: 'cone', delay: 7200 },
+          { type: 'normal', delay: 7500 },
+          { type: 'runner', delay: 7800 },
+          { type: 'cone', delay: 8100 },
+          { type: 'runner', delay: 8400 },
+        ],
+      },
+    ],
+  },
+};

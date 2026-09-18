@@ -1,0 +1,10 @@
+﻿[application]
+config/name="Test Project"
+run/main_scene="res://scenes/Test.tscn"
+config/features=PackedStringArray("4.0")
+
+[autoload]
+
+[rendering]
+renderer/name="ForwardPlus"
+use_hdr=false

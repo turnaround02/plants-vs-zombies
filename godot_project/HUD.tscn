@@ -1,0 +1,24 @@
+[gd_scene load_steps=2 format=3]
+
+[node name="HUD" type="CanvasLayer"]
+canvas_layer = true
+
+[node name="SunLabel" type="Label" parent="."]
+margin_left = 10
+margin_top = 10
+margin_right = 110
+margin_bottom = 50
+text = "☀️ 150"
+align = 0
+valign = 1
+custom_font_size = 24
+
+[node name="WaveLabel" type="Label" parent="."]
+margin_left = 200
+margin_top = 10
+margin_right = 300
+margin_bottom = 50
+text = "Wave: 1"
+align = 0
+valign = 1
+custom_font_size = 24

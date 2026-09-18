@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>植物大战僵尸 - 塔防游戏</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game-container">
+    <div id="hud">
+      <div id="sun-counter">
+        <span id="sun-icon">☀️</span>
+        <span id="sun-amount">150</span>
+      </div>
+      <div id="plant-cards"></div>
+      <div id="wave-info">
+        <span id="wave-text">第 1/5 波</span>
+        <div id="progress-bar"><div id="progress-fill"></div></div>
+      </div>
+      <button id="pause-btn" title="菜单 / 暂停">☰</button>
+    </div>
+    <canvas id="game-canvas" width="960" height="600"></canvas>
+    <div id="menu-overlay" class="overlay">
+      <h1>🌻 植物大战僵尸 🌻</h1>
+      <p>保卫你的家园！放置植物，抵御僵尸入侵。</p>
+      <p id="level-info" style="font-size:16px;color:#ffd700;margin-bottom:15px;"></p>
+      <button id="start-btn">开始游戏</button>
+      <div id="help-text">
+        <p>🖱️ 点击植物卡片，再点击草地放置植物</p>
+        <p>☀️ 点击收集阳光，向日葵会生产阳光</p>
+        <p>🧟 阻止僵尸到达左侧房屋！</p>
+        <p>🌿 猫尾草 - 25阳光，穿透子弹</p>
+      </div>
+    </div>
+    <div id="result-overlay" class="overlay hidden">
+      <h1 id="result-title"></h1>
+      <p id="result-text"></p>
+      <button id="restart-btn">再来一局</button>
+    </div>
+    <div id="pause-overlay" class="overlay hidden">
+      <h1>⏸ 暂停</h1>
+      <div id="pause-menu">
+        <button id="resume-btn">继续游戏</button>
+        <button id="restart-pause-btn">重新开始</button>
+        <button id="level-select-btn">选择关卡</button>
+        <button id="main-menu-btn">返回主页</button>
+      </div>
+      <div id="level-select" class="hidden">
+        <h2>选择关卡</h2>
+        <div id="level-grid"></div>
+        <button id="back-btn">返回</button>
+      </div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/plants.js"></script>
+  <script src="js/zombies.js"></script>
+  <script src="js/level.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

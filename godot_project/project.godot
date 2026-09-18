@@ -1,0 +1,26 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Plants Vs Zombies Godot Run"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7")
+
+[autoload]
+
+Input="res://InputManager.gd"
+PlantTypes="res://PlantTypes.gd"
+
+[rendering]
+
+renderer/name="ForwardPlus"
+renderer/vram_compression=0
+use_hdr=true

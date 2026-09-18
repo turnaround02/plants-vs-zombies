@@ -1,0 +1,12 @@
+﻿[gd_scene load_steps=2 format=3]
+
+[node name="Test" type="Node2D"]
+
+[node name="CanvasLayer" type="CanvasLayer"]
+
+[node name="Label" type="Label" parent="CanvasLayer"]
+text = "Hello Godot 4.7!"
+offset_left = 400.0
+offset_top = 250.0
+offset_right = 560.0
+offset_bottom = 350.0

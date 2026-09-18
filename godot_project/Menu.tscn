@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Menu.gd" id=1]
+
+[node name="Menu" type="Control"]
+custom_minimum_size = Vector2(960, 600)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+anchors_preset = 15
+
+[node name="Button" type="Button" parent="CenterContainer"]
+text = "Start Game"
+
+script = ExtResource( 1 )

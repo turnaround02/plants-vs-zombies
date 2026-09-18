@@ -1,0 +1,37 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: false
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      dsh-plugin-subscriptions:
+        specifier: ^0.5.3
+        version: 0.5.3
+
+packages:
+
+  dsh-plugin-subscriptions@0.5.3:
+    resolution: {integrity: sha512-cH3OKBjCWTMHjvpJvfp9QUyq6sS1R6EyPS9FUVRiVZqd/KnV7ufVtwQXieA0QgC6TeyMWlBfig8nlrtLMzsHGA==}
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-attachment': ^0.1.1-rc.2
+      '@deepseek-ai/dsh-home-paths': ^0.1.1-rc.2
+      '@deepseek-ai/dsh-llm': ^0.1.1-rc.2
+      '@deepseek-ai/dsh-tools': ^0.1.1-rc.2
+      '@deepseek-ai/schemastery': ^3.18.1
+
+  undici@7.29.0:
+    resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
+    engines: {node: '>=20.18.1'}
+
+snapshots:
+
+  dsh-plugin-subscriptions@0.5.3:
+    dependencies:
+      undici: 7.29.0
+
+  undici@7.29.0: {}

@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://PlantCard.gd" id=1]
+
+[node name="PlantCard" type="Button"]
+custom_minimum_size = Vector2(100, 100)
+theme_override_font_sizes/font_size = 24
+
+script = ExtResource( 1 )
