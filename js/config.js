@@ -194,6 +194,42 @@ const ZOMBIE_TYPES = {
     color: '#e53935',
     score: 15,
   },
+  bucket: {
+    id: 'bucket',
+    name: '铁桶僵尸',
+    icon: '🪣',
+    hp: 400,
+    speed: 16,
+    damage: 12,
+    attackInterval: 1000,
+    color: '#9e9e9e',
+    score: 30,
+  },
+  poleVault: {
+    id: 'poleVault',
+    name: '撑杆僵尸',
+    icon: '🤸',
+    hp: 80,
+    speed: 45,
+    damage: 8,
+    attackInterval: 800,
+    color: '#ff9800',
+    score: 25,
+    jumpOverPlant: true, // 冲刺到植物前跳跃越过第一排
+  },
+  newspaper: {
+    id: 'newspaper',
+    name: '读报僵尸',
+    icon: '📰',
+    hp: 130,
+    speed: 18,
+    damage: 10,
+    attackInterval: 800,
+    color: '#ffb74d',
+    score: 20,
+    newspaperBehavior: true, // 被击后丢报纸加速
+    speedAfterHit: 30,       // 被首次命中后的加速值
+  },
 };
 
 // ============================================================
