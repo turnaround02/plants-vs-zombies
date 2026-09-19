@@ -116,16 +116,10 @@ func _make_placeholder() -> void:
     _sprite.offset = Vector2(20, 20)
 
 func _get_target_zombie() -> Node:
-    var main = get_tree().root.get_node("Main")
-    if not main:
+    var main = get_tree().get_first_node_in_group("main")
+    if main == null:
         return null
-    var zombies = main.get_tree().get_nodes_in_group("zombies")
-    var closest: Node = null
-    var closest_dist: float = 1e9
-    for z in zombies:
-        if z.row_index == row and z.position.x > position.x:
-            var dist = z.position.x - position.x
-            if dist < closest_dist and dist <= type.get("range", 400):
-                closest = z
-                closest_dist = dist
-    return closest
+    for z in main.get_zombies():
+        if z.get("row_index") == row and z.get("_dead", false) == false:
+            return z
+    return null

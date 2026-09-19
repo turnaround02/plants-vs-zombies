@@ -44,6 +44,7 @@ var wave_prepare_time: float = 2.0  # seconds to show wave number before spawnin
 var wave_prepare_timer: float = 0.0
 
 func _ready() -> void:
+    add_to_group("main")
     sun = sun_start
     sun_fall_timer = 0.0
     # Get HUD labels
@@ -291,3 +292,6 @@ func shoot_projectile(from_row: int, from_x: float, damage: int) -> void:
 
 func _on_plant_exited(key: String) -> void:
     occupied_cells.erase(key)
+
+func get_zombies() -> Array:
+    return get_tree().get_nodes_in_group("zombies")

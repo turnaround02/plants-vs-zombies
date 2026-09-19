@@ -22,16 +22,14 @@ func _process(delta: float) -> void:
     if not _active:
         return
     position.x -= speed * delta
-    # Off screen check
-    if position.x < -30:
+    var main = get_tree().get_first_node_in_group("main")
+    if main != null:
+        for z in main.get_zombies():
+            if z.get("row_index") == row and z.get("_dead", false) == false:
+                var dist = abs(z.position.x - position.x)
+                if dist < 25:  # collision radius
+                    z.take_damage(damage)
+                    queue_free()
+                    return
+    if position.x < -50:
         queue_free()
-        return
-    # Check collision with zombies in the same row
-    for z in get_tree().get_nodes_in_group("zombies"):
-        if z.row_index == row:
-            var dist = abs(z.position.x - position.x)
-            if dist < 25:  # collision radius
-                z.take_damage(damage)
-                _active = false
-                queue_free()
-                return
