@@ -28,6 +28,15 @@ const CONFIG = {
   // 房屋位置(僵尸到达即失败)
   HOUSE_X: 60,
 
+  // 割草机: 每行1台，僵尸越过触发线时清整行（一次性保险）
+  MOWER_TRIGGER_X: 80,    // 僵尸 x < 该值触发
+  MOWER_START_X: 40,
+  MOWER_SPEED: 600,       // 像素/秒，向右行驶
+  MOWER_DAMAGE: 500,      // 一次性清行伤害
+
+  // 铲子: 铲除植物回收阳光比例
+  SHOVEL_REFUND_RATE: 0.5,
+
   // 僵尸生成位置
   ZOMBIE_SPAWN_X: 1010,
 

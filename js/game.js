@@ -16,6 +16,7 @@ class Game {
     this.projectiles = [];
     this.suns = [];
     this.explosions = [];
+    this.mowers = [];
 
     // 网格占用
     this.grid = [];
@@ -25,6 +26,7 @@ class Game {
 
     // 输入状态
     this.selectedPlant = null;
+    this.shovelMode = false; // 铲子模式（与植物选择互斥）
     this.hoverCell = null;
     this.mouseX = 0;
     this.mouseY = 0;
@@ -63,11 +65,13 @@ class Game {
     this.projectiles = [];
     this.suns = [];
     this.explosions = [];
+    this.mowers = this._initMowers();
     this.grid = [];
     for (let r = 0; r < CONFIG.ROWS; r++) {
       this.grid.push(new Array(CONFIG.COLS).fill(null));
     }
     this.selectedPlant = null;
+    this.shovelMode = false;
     this.sunFallTimer = 0;
     this.gameTime = 0;
     this.score = 0;
@@ -146,6 +150,9 @@ class Game {
       zombie.update(dt, this);
     }
     this.zombies = this.zombies.filter(z => z.alive);
+
+    // 更新割草机
+    this.updateMowers(dt);
 
     // 更新子弹
     for (const proj of this.projectiles) {
@@ -263,6 +270,9 @@ class Game {
       ctx.fill();
     }
 
+    // 割草机
+    this.renderMowers(ctx);
+
     // 爆炸效果
     for (const exp of this.explosions) {
       const progress = exp.life / exp.duration;
@@ -278,11 +288,65 @@ class Game {
       ctx.fill();
     }
 
+    // 铲子预览
+    this.renderShovelPreview(ctx);
+
     // 放置预览
     this.renderPlacementPreview(ctx);
 
     // 房屋
     this.renderHouse(ctx);
+  }
+
+  renderMowers(ctx) {
+    for (const m of this.mowers) {
+      if (m.spent && !m.active) continue;
+      const y = CONFIG.GRID_OFFSET_Y + m.row * CONFIG.CELL_HEIGHT + CONFIG.CELL_HEIGHT / 2;
+      // 未激活的待命割草机显示在房屋右侧
+      if (!m.active) {
+        ctx.globalAlpha = 0.6;
+        this._drawMower(ctx, CONFIG.MOWER_START_X + 10, y);
+        ctx.globalAlpha = 1;
+      } else {
+        this._drawMower(ctx, m.x, y);
+      }
+    }
+  }
+
+  _drawMower(ctx, x, y) {
+    // 机身
+    ctx.fillStyle = '#b71c1c';
+    ctx.fillRect(x - 18, y - 14, 36, 28);
+    // 刀片
+    ctx.strokeStyle = '#9e9e9e';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x - 18, y, 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x + 18, y, 10, 0, Math.PI * 2);
+    ctx.stroke();
+    // 车头标识
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(x - 10, y - 8, 20, 6);
+  }
+
+  renderShovelPreview(ctx) {
+    if (!this.shovelMode || this.state !== 'playing') return;
+    const cell = this.getCellFromMouse();
+    if (!cell) return;
+    const { row, col } = cell;
+    const x = CONFIG.GRID_OFFSET_X + col * CONFIG.CELL_WIDTH;
+    const y = CONFIG.GRID_OFFSET_Y + row * CONFIG.CELL_HEIGHT;
+    const hasPlant = this.grid[row][col] !== null;
+    ctx.fillStyle = hasPlant ? 'rgba(255,152,0,0.4)' : 'rgba(158,158,158,0.3)';
+    ctx.fillRect(x, y, CONFIG.CELL_WIDTH, CONFIG.CELL_HEIGHT);
+    ctx.globalAlpha = 0.8;
+    ctx.font = '30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🪏', x + CONFIG.CELL_WIDTH / 2, y + CONFIG.CELL_HEIGHT / 2);
+    ctx.globalAlpha = 1;
   }
 
   renderBackground(ctx) {
@@ -420,7 +484,7 @@ class Game {
   }
 
   renderPlacementPreview(ctx) {
-    if (!this.selectedPlant || this.state !== 'playing') return;
+    if (!this.selectedPlant || this.state !== 'playing' || this.shovelMode) return;
 
     const cell = this.getCellFromMouse();
     if (!cell) return;
@@ -440,6 +504,58 @@ class Game {
     ctx.textBaseline = 'middle';
     ctx.fillText(this.selectedPlant.icon, x + CONFIG.CELL_WIDTH / 2, y + CONFIG.CELL_HEIGHT / 2);
     ctx.globalAlpha = 1;
+  }
+
+  // ==========================================================
+  // 割草机（每行一台一次性保险）
+  // ==========================================================
+
+  _initMowers() {
+    const mowers = [];
+    for (let r = 0; r < CONFIG.ROWS; r++) {
+      mowers.push({ row: r, active: false, spent: false, x: CONFIG.MOWER_START_X });
+    }
+    return mowers;
+  }
+
+  updateMowers(dt) {
+    for (const m of this.mowers) {
+      if (m.spent) continue;
+      if (!m.active) {
+        const trigger = this.zombies.some(z => z.row === m.row && !z.dead && !z.isAlly && z.x < CONFIG.MOWER_TRIGGER_X);
+        if (trigger) {
+          m.active = true;
+          m.spent = true;
+          m.x = CONFIG.MOWER_START_X;
+        }
+      }
+      if (m.active) {
+        m.x += CONFIG.MOWER_SPEED * (dt / 1000);
+        for (const z of this.zombies) {
+          if (z.row === m.row && !z.dead && z.x <= m.x + 25) {
+            z.takeDamage(CONFIG.MOWER_DAMAGE);
+            if (z.dead) this.recordKill(z.typeId);
+          }
+        }
+        if (m.x > CONFIG.CANVAS_WIDTH + 50) m.active = false;
+      }
+    }
+  }
+
+  // ==========================================================
+  // 铲子（铲除植物回收阳光）
+  // ==========================================================
+
+  removePlant(row, col) {
+    const plant = this.grid[row] ? this.grid[row][col] : null;
+    if (!plant) return 0;
+    const refund = Math.floor(plant.type.cost * CONFIG.SHOVEL_REFUND_RATE);
+    this.grid[row][col] = null;
+    plant.alive = false;
+    this.plants = this.plants.filter(p => p !== plant);
+    this.sun += refund;
+    this.emitSunChange();
+    return refund;
   }
 
   // ==========================================================
@@ -469,6 +585,16 @@ class Game {
         }
       }
 
+      // 铲子模式：铲除植物回收阳光
+      if (this.shovelMode) {
+        const cell = this.getCellFromMouse();
+        if (cell && this.grid[cell.row][cell.col]) {
+          const refund = this.removePlant(cell.row, cell.col);
+          if (refund > 0) Sound.collectSun();
+        }
+        return;
+      }
+
       // 再检查放置植物
       if (this.selectedPlant) {
         const cell = this.getCellFromMouse();
@@ -478,10 +604,11 @@ class Game {
       }
     });
 
-    // 右键取消选择
+    // 右键取消选择 / 退出铲子模式
     this.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       this.selectedPlant = null;
+      this.shovelMode = false;
       this.emitStateChange();
     });
   }

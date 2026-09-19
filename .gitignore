@@ -3,3 +3,8 @@ test/screenshots/
 *.log
 .worktrees/
 .superpowers/
+docs/
+# Godot 编辑器缓存
+godot_project/.godot/
+# Godot 4.x 脚本 uid 缓存
+godot_project/*.uid

@@ -30,6 +30,7 @@ class UI {
     this.mainMenuBtn = document.getElementById('main-menu-btn');
     this.levelGrid = document.getElementById('level-grid');
     this.backBtn = document.getElementById('back-btn');
+    this.shovelBtn = document.getElementById('shovel-btn');
 
     // 卡片冷却状态
     this.cardCooldowns = {};
@@ -44,6 +45,7 @@ class UI {
 
     // 绑定 UI 事件
     this.bindEvents();
+    this.bindShovel();
 
     // 初始化卡片
     this.buildPlantCards();
@@ -130,6 +132,17 @@ class UI {
     }
   }
 
+  bindShovel() {
+    this.shovelBtn.addEventListener('click', () => {
+      Sound.click();
+      if (this.game.state !== 'playing') return;
+      // 与植物选择互斥
+      this.game.shovelMode = !this.game.shovelMode;
+      if (this.game.shovelMode) this.game.selectedPlant = null;
+      this.game.emitStateChange();
+    });
+  }
+
   openLevelSelect() {
     this.pauseOverlay.classList.remove('hidden');
     document.getElementById('pause-menu').classList.add('hidden');
@@ -194,6 +207,7 @@ class UI {
       this.game.selectedPlant = null;
     } else {
       this.game.selectedPlant = type;
+      this.game.shovelMode = false; // 选植物时退出铲子模式
     }
     this.game.emitStateChange();
   }
@@ -213,6 +227,9 @@ class UI {
       card.classList.toggle('selected', this.game.selectedPlant && this.game.selectedPlant.id === typeId);
       card.classList.toggle('disabled', this.game.sun < type.cost || this.isOnCooldown(typeId));
     });
+
+    // 更新铲子按钮状态
+    this.shovelBtn.classList.toggle('active', this.game.shovelMode);
 
     // 更新覆盖层
     this.menuOverlay.classList.toggle('hidden', data.state !== 'menu');

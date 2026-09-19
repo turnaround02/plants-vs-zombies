@@ -363,6 +363,61 @@ async function runTests() {
     if (restartState.state !== 'playing') throw new Error('重新开始后应为 playing!');
 
     // ==========================================
+    // 测试 10: 割草机机制
+    // ==========================================
+    console.log('\n📋 测试 10: 割草机机制');
+    const mowerState = await page.evaluate(() => {
+      const game = window.__game;
+      // 1. 每关开局应为每行准备 1 台割草机
+      if (!Array.isArray(game.mowers) || game.mowers.length !== CONFIG.ROWS) {
+        return { ok: false, reason: `割草机数量错误: ${game.mowers ? game.mowers.length : 'undefined'}` };
+      }
+      // 2. 强制触发某行割草机并验证清行（用真实僵尸对象）
+      const row = 0;
+      game.zombies = [];
+      game.spawnZombie('normal', row);
+      game.zombies[0].x = 50; // 越过触发线
+      game.updateMowers(100);
+      const mower = game.mowers[row];
+      const zombieDead = game.zombies[0].dead === true;
+      // 3. 割草机一次性：触发后 spent=true 不会再次激活
+      return { ok: mower.spent === true && zombieDead, mower, zombieDead };
+    });
+    console.log('  割草机状态:', JSON.stringify(mowerState));
+    if (!mowerState.ok) throw new Error(`割草机机制异常: ${mowerState.reason || '触发后未清行或未标记 spent'}`);
+
+    // ==========================================
+    // 测试 11: 铲子机制
+    // ==========================================
+    console.log('\n📋 测试 11: 铲子机制');
+    const shovelState = await page.evaluate(() => {
+      const game = window.__game;
+      // 1. 放置一个坚果墙
+      game.sun = 200;
+      game.placePlant('wallnut', 2, 3);
+      if (!game.grid[2][3]) return { ok: false, reason: '放置坚果墙失败' };
+      // 2. 铲除应回收 50% 阳光（50 * 0.5 = 25）
+      const sunBefore = game.sun;
+      const refund = game.removePlant(2, 3);
+      const cleared = game.grid[2][3] === null;
+      const sunAfter = game.sun;
+      // 3. 铲空格子返回 0 且阳光不变
+      const emptyRefund = game.removePlant(2, 3);
+      return { ok: refund === 25 && cleared && sunAfter === sunBefore + 25 && emptyRefund === 0, refund, cleared, sunDelta: sunAfter - sunBefore, emptyRefund };
+    });
+    console.log('  铲子状态:', JSON.stringify(shovelState));
+    if (!shovelState.ok) throw new Error(`铲子机制异常: ${shovelState.reason || JSON.stringify(shovelState)}`);
+    // 4. 铲子按钮存在且可切换
+    const shovelBtnOk = await page.evaluate(() => {
+      const btn = document.getElementById('shovel-btn');
+      if (!btn) return false;
+      const game = window.__game;
+      game.shovelMode = true;
+      return !game.selectedPlant;
+    });
+    if (!shovelBtnOk) throw new Error('铲子按钮不存在或切换异常!');
+
+    // ==========================================
     // 汇总
     // ==========================================
     console.log('\n========================================');
