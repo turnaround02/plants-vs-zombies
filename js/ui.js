@@ -39,6 +39,7 @@ class UI {
     game.onSunChange = (sun) => this.updateSun(sun);
     game.onWaveChange = (info) => this.updateWave(info);
     game.onPlantPlaced = (typeId) => this.startCooldown(typeId);
+    game.onScoreChange = (score, kills) => this.updateScore(score, kills);
 
     // 绑定 UI 事件
     this.bindEvents();
@@ -52,6 +53,7 @@ class UI {
     // 初始渲染
     this.updateSun(game.sun);
     this.updateWave({ current: 1, total: LEVELS[1].waves.length, state: 'idle' });
+    this.updateScore(game.score, game.kills);
     this.updateLevelInfo();
   }
 
@@ -249,6 +251,11 @@ class UI {
       const type = PLANT_TYPES[typeId];
       card.classList.toggle('disabled', sun < type.cost || this.isOnCooldown(typeId));
     });
+  }
+
+  updateScore(score, kills) {
+    const el = document.getElementById('score-text');
+    if (el) el.textContent = `得分 ${score}`;
   }
 
   updateWave(info) {

@@ -36,11 +36,16 @@ class Game {
     // 关卡
     this.levelManager = null;
 
+    // 得分统计
+    this.score = 0;
+    this.kills = 0;
+
     // 回调
     this.onStateChange = null;
     this.onSunChange = null;
     this.onWaveChange = null;
     this.onPlantPlaced = null;
+    this.onScoreChange = null;
 
     // 绑定事件
     this.bindEvents();
@@ -65,6 +70,8 @@ class Game {
     this.selectedPlant = null;
     this.sunFallTimer = 0;
     this.gameTime = 0;
+    this.score = 0;
+    this.kills = 0;
 
     this.levelManager = new LevelManager(levelId);
     this.levelManager.start();
@@ -126,6 +133,10 @@ class Game {
           if (!proj.hitZombies.has(target)) {
             proj.hitZombies.add(target);
             target.takeDamage(proj.damage);
+            if (target.dead) {
+              this.recordKill(target.typeId);
+              SaveStore.recordKill();
+            }
             if (proj.slowFactor > 0) {
               target.applySlow(proj.slowFactor, proj.slowDuration);
             }
@@ -527,6 +538,20 @@ class Game {
     this.emitSunChange();
   }
 
+  recordKill(typeId) {
+    const type = ZOMBIE_TYPES[typeId];
+    this.kills++;
+    this.score += (type && type.score) || 10;
+    this.emitScoreChange();
+  }
+
+  // 过关奖励：基础500 + 剩余阳光折算
+  computeClearBonus() {
+    const base = 500;
+    const sunBonus = Math.floor(this.sun / 10); // 每10阳光=1分
+    return base + sunBonus;
+  }
+
   addExplosion(x, y, radius, damage) {
     // 对范围内僵尸造成伤害
     for (const zombie of this.zombies) {
@@ -599,9 +624,15 @@ class Game {
   }
 
   onAllWavesComplete() {
+    const bonus = this.computeClearBonus();
+    this.score += bonus;
+    this.lastBonus = bonus;
     this.state = 'win';
     Sound.win();
+    SaveStore.addClearScore(this.levelManager.level.id, this.score);
+    SaveStore.recordWin();
     this.emitStateChange();
+    this.emitScoreChange();
   }
 
   // ==========================================================
@@ -627,6 +658,12 @@ class Game {
   emitWaveChange() {
     if (this.onWaveChange && this.levelManager) {
       this.onWaveChange(this.levelManager.getWaveInfo());
+    }
+  }
+
+  emitScoreChange() {
+    if (this.onScoreChange) {
+      this.onScoreChange(this.score, this.kills);
     }
   }
 }

@@ -376,3 +376,12 @@ body {
     transform: scale(0.8);
   }
 }
+#score-info {
+  margin-left: 12px;
+  padding: 4px 10px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 8px;
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 14px;
+}
