@@ -52,6 +52,14 @@ var types: Dictionary = {
         "fuse_time": 1.0,
         "behavior": "bomb"
     },
+    # 坚果墙：高耐久屏障（与浏览器版 PLANT_TYPES.wallnut 对齐）
+    "wallnut": {
+        "name": "Wall-nut",
+        "icon": "🥜",
+        "cost": 50,
+        "hp": 400,
+        "behavior": "wall"
+    },
     # 双发豌豆：一次发射两颗子弹
     "repeater": {
         "name": "Repeater",
