@@ -110,3 +110,7 @@ func take_damage(dmg: int) -> void:
     if hp <= 0 and not _dead:
         _dead = true
         _death_timer = 0.0
+
+## 是否被攻击致死（用于 Main 判断"击杀得分"，区别于过关清理 queue_free）
+func is_killed() -> bool:
+    return _dead

@@ -15,6 +15,15 @@ var sun_fall_timer: float
 # Reference to HUD label (we'll get it in _ready)
 var hud_sun_label: Label
 var hud_wave_label: Label
+var hud_score_label: Label
+
+# 得分统计（与浏览器版 Task 6 对齐）
+var score: int = 0
+var kills: int = 0
+var last_bonus: int = 0
+
+# 存档路径（Godot 用户目录）
+const SAVE_PATH := "user://save.cfg"
 # Reference to Grid node
 var grid: Node2D
 # Reference to PlantBar node
@@ -53,6 +62,7 @@ func _ready() -> void:
     if hud_node:
         hud_sun_label = hud_node.get_node("SunLabel")
         hud_wave_label = hud_node.get_node("WaveLabel")
+        hud_score_label = hud_node.get_node("ScoreLabel")
         if hud_sun_label:
             hud_sun_label.text = "Sun: " + str(sun)
         else:
@@ -61,6 +71,10 @@ func _ready() -> void:
             hud_wave_label.text = "Wave: " + str(wave_number)
         else:
             push_error("Could not find WaveLabel in HUD")
+        if hud_score_label:
+            hud_score_label.text = "Score: 0"
+        else:
+            push_error("Could not find ScoreLabel in HUD")
     else:
         push_error("Could not find HUD node")
     # Get Grid
@@ -247,16 +261,26 @@ func spawn_zombie(zombie_type: String = "normal") -> void:
     zombie_instance.position = Vector2(start_x, y)
     add_child(zombie_instance)
     zombies_alive += 1
-    zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited"))
+    # 传入僵尸实例，以便在 tree_exiting 时判断是否被击杀并累计得分
+    zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited", [zombie_instance]))
 
-func _on_zombie_exited() -> void:
+func _on_zombie_exited(zombie: Node) -> void:
     zombies_alive -= 1
+    # 判断是"被击杀"而非"自然消失"（如过关清理 queue_free 也会触发 tree_exiting）
+    # Zombie.gd 中 _dead 为 true 表示被攻击致死；自然走到 x<=0 时调用 zombie_reached 但不置 _dead
+    if zombie and zombie.has_method("is_killed") and zombie.is_killed():
+        record_kill(zombie.type_id)
     # 若全部生成且无存活僵尸，将在 _update_wave 中检测到并进入波次间歇
 
 ## 当前关卡全部波次清空，触发胜利
 func _on_level_won() -> void:
     game_won = true
     print("Level ", current_level_id, " won! All waves cleared.")
+    # 过关奖励：基础500 + 剩余阳光折算（与浏览器版 Task 6 对齐）
+    last_bonus = 500 + sun / 10
+    score += last_bonus
+    _update_score_display()
+    _save_progress()
     # 更新 HUD 并停止后续波次
     _update_wave_label()
     # 胜利后进入下一关（若未到最后关），否则停留在胜利状态
@@ -353,3 +377,52 @@ func _on_plant_exited(key: String) -> void:
 
 func get_zombies() -> Array:
     return get_tree().get_nodes_in_group("zombies")
+
+## 击杀记录：按僵尸类型累加得分
+func record_kill(zombie_type: String) -> void:
+    var type_data = ZombieTypes.get_type(zombie_type)
+    score += int(type_data.get("score", 10))
+    kills += 1
+    _update_score_display()
+
+## 更新得分显示
+func _update_score_display() -> void:
+    if hud_score_label:
+        hud_score_label.text = "Score: " + str(score)
+
+## 存档到 user://save.cfg
+func _save_progress() -> void:
+    var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+    if file:
+        # 读取已有存档并累加
+        var total_score := 0
+        var wins := 0
+        var unlocked := 1
+        if FileAccess.file_exists(SAVE_PATH):
+            var old_file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+            if old_file:
+                var old_data = JSON.parse_string(old_file.get_as_text())
+                old_file.close()
+                if old_data:
+                    total_score = int(old_data.get("total_score", 0))
+                    wins = int(old_data.get("wins", 0))
+                    unlocked = int(old_data.get("unlocked_level", 1))
+        var data := {
+            "unlocked_level": max(unlocked, current_level_id + 1),
+            "total_score": total_score + score,
+            "wins": wins + 1,
+        }
+        file.store_string(JSON.stringify(data))
+        file.close()
+
+## 加载存档
+func _load_progress() -> Dictionary:
+    if not FileAccess.file_exists(SAVE_PATH):
+        return {"unlocked_level": 1, "total_score": 0, "wins": 0}
+    var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+    if file:
+        var data = JSON.parse_string(file.get_as_text())
+        file.close()
+        if data:
+            return data
+    return {"unlocked_level": 1, "total_score": 0, "wins": 0}
