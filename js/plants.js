@@ -165,8 +165,8 @@ class Plant {
         break;
     }
 
-    // 血条(受伤时显示)
-    if (this.hp < this.maxHp) {
+    // 血条(常驻)
+    {
       const barW = 40;
       const barH = 5;
       const barX = x - barW / 2;

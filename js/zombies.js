@@ -156,8 +156,8 @@ class Zombie {
     this.renderBody(ctx, 0, 0);
     ctx.restore();
 
-    // 血条
-    if (this.hp < this.maxHp) {
+    // 血条(常驻)
+    {
       const barW = 36;
       const barH = 4;
       const barX = x - barW / 2;
@@ -166,6 +166,13 @@ class Zombie {
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = this.hp / this.maxHp > 0.5 ? '#4caf50' : '#f44336';
       ctx.fillRect(barX, barY, barW * (this.hp / this.maxHp), barH);
+    }
+
+    // 魅惑标识
+    if (this.isAlly) {
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🌀', x, y - 52);
     }
 
     // 减速效果(蓝色覆盖)
