@@ -376,3 +376,33 @@ body {
     transform: scale(0.8);
   }
 }
+#score-info {
+  margin-left: 12px;
+  padding: 4px 10px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 8px;
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* 锁定关卡样式 */
+.level-btn.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+.level-btn.locked:disabled {
+  background: #555;
+}
+
+#checkpoint-btn {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background: linear-gradient(to bottom, #26c6da, #00acc1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}

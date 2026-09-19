@@ -22,3 +22,13 @@ text = "Wave: 1"
 align = 0
 valign = 1
 custom_font_size = 24
+
+[node name="ScoreLabel" type="Label" parent="."]
+margin_left = 380
+margin_top = 10
+margin_right = 500
+margin_bottom = 50
+text = "Score: 0"
+align = 0
+valign = 1
+custom_font_size = 24

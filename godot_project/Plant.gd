@@ -15,6 +15,9 @@ var alive: bool = true
 var sun_timer: float = 0.0
 var fire_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
+# 炸弹类（cherrybomb/explosiveShroom）的引信计时
+var fuse_timer: float = 0.0
+var _exploded: bool = false
 
 # Reference to sprite for visual feedback
 var _sprite: Sprite2D
@@ -40,6 +43,11 @@ func _ready() -> void:
         "shooter":
             pass
         "wall":
+            pass
+        "bomb":
+            # 炸弹类：开始引信倒计时，到时后爆炸并消失
+            fuse_timer = 0.0
+        "charm":
             pass
         _:
             pass
@@ -89,16 +97,68 @@ func _process(delta: float) -> void:
             fire_timer += delta
             if fire_timer >= type.fire_rate:
                 fire_timer = 0.0
-                # Check if there is a zombie in front within range
+                # 双射豌豆（dualRow）：同时攻击本行与相邻行
+                var rows_to_shoot: Array[int] = [row]
+                if type.get("dual_row", false):
+                    var adjacent = row + 1
+                    if adjacent < 5:  # 行数上限（5 行）
+                        rows_to_shoot.append(adjacent)
+                # 检查本行范围内是否有僵尸，有则对所有目标行发射
                 var target = _get_target_zombie()
                 if target:
                     var main = get_tree().root.get_node("Main")
                     if main:
-                        main.shoot_projectile(row, position.x, type.damage)
+                        for r in rows_to_shoot:
+                            main.shoot_projectile(r, position.x, type.damage)
         "wall":
             pass
+        "bomb":
+            # 引信倒计时，到时后对周围大范围造成伤害并消失
+            if _exploded:
+                return
+            fuse_timer += delta
+            var fuse_time: float = type.get("fuse_time", 1.0)
+            if fuse_timer >= fuse_time:
+                _exploded = true
+                _do_explosion()
+        "charm":
+            # 魅惑菇：与僵尸接触时魅惑（转换为友方），随后消失
+            _do_charm()
         _:
             pass
+
+# 爆炸：对 blast_radius 范围内的所有僵尸造成 damage
+func _do_explosion() -> void:
+    var damage: int = type.get("damage", 0)
+    var blast_radius: int = type.get("blast_radius", 120)
+    var main = get_tree().get_first_node_in_group("main")
+    if main == null:
+        queue_free()
+        return
+    for z in main.get_zombies():
+        if z.get("_dead", false):
+            continue
+        var dist = z.position.distance_to(position)
+        if dist <= blast_radius:
+            z.take_damage(damage)
+    queue_free()
+
+# 魅惑：找到相邻的僵尸并将其转换为友方（向右行走）
+func _do_charm() -> void:
+    var main = get_tree().get_first_node_in_group("main")
+    if main == null:
+        return
+    for z in main.get_zombies():
+        if z.get("_dead", false):
+            continue
+        if z.get("row_index") == row and z.position.distance_to(position) < 40.0:
+            # 魅惑：让僵尸转为友方（向右侧行走）
+            if z.has_method("set_charmed"):
+                z.set_charmed(true)
+            elif z.has_method("charm"):
+                z.charm()
+            break
+    queue_free()
 
 func _make_placeholder() -> void:
     var img := Image.create(40, 40, false, Image.FORMAT_RGBA8)
@@ -116,16 +176,10 @@ func _make_placeholder() -> void:
     _sprite.offset = Vector2(20, 20)
 
 func _get_target_zombie() -> Node:
-    var main = get_tree().root.get_node("Main")
-    if not main:
+    var main = get_tree().get_first_node_in_group("main")
+    if main == null:
         return null
-    var zombies = main.get_tree().get_nodes_in_group("zombies")
-    var closest: Node = null
-    var closest_dist: float = 1e9
-    for z in zombies:
-        if z.row_index == row and z.position.x > position.x:
-            var dist = z.position.x - position.x
-            if dist < closest_dist and dist <= type.get("range", 400):
-                closest = z
-                closest_dist = dist
-    return closest
+    for z in main.get_zombies():
+        if z.get("row_index") == row and z.get("_dead", false) == false:
+            return z
+    return null

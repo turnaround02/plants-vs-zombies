@@ -117,7 +117,7 @@ async function runTests() {
     if (!initState.hasGame) throw new Error('游戏未初始化!');
     if (initState.state !== 'menu') throw new Error(`初始状态应为 menu, 实际为 ${initState.state}`);
     if (!initState.menuVisible) throw new Error('主菜单未显示!');
-    if (initState.plantCards !== 8) throw new Error(`应有 8 张植物卡片, 实际 ${initState.plantCards}`);
+    if (initState.plantCards !== 11) throw new Error(`应有 11 张植物卡片, 实际 ${initState.plantCards}`);
     if (initState.canvasSize.w !== 960 || initState.canvasSize.h !== 600) {
       throw new Error(`画布尺寸错误: ${JSON.stringify(initState.canvasSize)}`);
     }

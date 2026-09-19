@@ -21,6 +21,7 @@ class UI {
     this.resultText = document.getElementById('result-text');
     this.startBtn = document.getElementById('start-btn');
     this.restartBtn = document.getElementById('restart-btn');
+    this.checkpointBtn = document.getElementById('checkpoint-btn');
     this.pauseBtn = document.getElementById('pause-btn');
     this.levelInfoEl = document.getElementById('level-info');
     this.resumeBtn = document.getElementById('resume-btn');
@@ -39,6 +40,7 @@ class UI {
     game.onSunChange = (sun) => this.updateSun(sun);
     game.onWaveChange = (info) => this.updateWave(info);
     game.onPlantPlaced = (typeId) => this.startCooldown(typeId);
+    game.onScoreChange = (score, kills) => this.updateScore(score, kills);
 
     // 绑定 UI 事件
     this.bindEvents();
@@ -52,6 +54,7 @@ class UI {
     // 初始渲染
     this.updateSun(game.sun);
     this.updateWave({ current: 1, total: LEVELS[1].waves.length, state: 'idle' });
+    this.updateScore(game.score, game.kills);
     this.updateLevelInfo();
   }
 
@@ -68,6 +71,13 @@ class UI {
       Sound.click();
       this.updateLevelInfo();
       this.game.startLevel(this.currentLevel);
+    });
+
+    this.checkpointBtn.addEventListener('click', () => {
+      Sound.click();
+      if (this.game.restoreCheckpoint(this.currentLevel)) {
+        this.checkpointBtn.classList.add('hidden');
+      }
     });
 
     this.pauseBtn.addEventListener('click', () => {
@@ -137,7 +147,14 @@ class UI {
       const level = LEVELS[id];
       const btn = document.createElement('button');
       btn.className = 'level-btn';
-      btn.innerHTML = `<span>第 ${id} 关</span><span class="level-name">${level.name}</span>`;
+      const unlocked = SaveStore.isLevelUnlocked(id);
+      btn.innerHTML = unlocked
+        ? `<span>第 ${id} 关</span><span class="level-name">${level.name}</span>`
+        : `<span>🔒 第 ${id} 关</span><span class="level-name">${level.name}</span>`;
+      if (!unlocked) {
+        btn.disabled = true;
+        btn.classList.add('locked');
+      }
       btn.addEventListener('click', () => {
         Sound.click();
         this.currentLevel = parseInt(id);
@@ -208,16 +225,18 @@ class UI {
       const levelName = LEVELS[this.currentLevel] ? LEVELS[this.currentLevel].name : '关卡';
       this.resultTitle.textContent = '🎉 胜利！';
       this.resultTitle.className = 'win';
+      this.checkpointBtn.classList.add('hidden');
+      const stats = `得分 ${this.game.score} · 击杀 ${this.game.kills} · 过关奖励 +${this.game.lastBonus || 0}`;
       const nextLevel = this.currentLevel + 1;
       const hasMore = nextLevel <= this.totalLevels;
       if (hasMore) {
-        this.resultText.textContent = `成功完成「${levelName}」！\n点击下方按钮挑战下一关，或重玩本关。`;
+        this.resultText.textContent = `成功完成「${levelName}」！\n${stats}\n点击下方按钮挑战下一关，或重玩本关。`;
         this.restartBtn.textContent = '下一关 ▶';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #ff9800, #f57c00)';
         this.restartBtn.title = `挑战第 ${nextLevel} 关`;
         this.currentLevel = nextLevel;
       } else {
-        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n你是植物大师！🌟`;
+        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n${stats}\n你是植物大师！🌟`;
         this.restartBtn.textContent = '再来一局';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
         this.restartBtn.title = '从头开始';
@@ -231,6 +250,12 @@ class UI {
       this.restartBtn.textContent = '再来一局';
       this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
       this.restartBtn.title = '';
+      // 若存在检查点则显示"从检查点继续"按钮
+      if (SaveStore.loadCheckpoint(this.currentLevel)) {
+        this.checkpointBtn.classList.remove('hidden');
+      } else {
+        this.checkpointBtn.classList.add('hidden');
+      }
     }
 
     // 放置植物后开始冷却
@@ -249,6 +274,11 @@ class UI {
       const type = PLANT_TYPES[typeId];
       card.classList.toggle('disabled', sun < type.cost || this.isOnCooldown(typeId));
     });
+  }
+
+  updateScore(score, kills) {
+    const el = document.getElementById('score-text');
+    if (el) el.textContent = `得分 ${score}`;
   }
 
   updateWave(info) {

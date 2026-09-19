@@ -19,6 +19,9 @@
         <span id="wave-text">第 1/5 波</span>
         <div id="progress-bar"><div id="progress-fill"></div></div>
       </div>
+      <div id="score-info">
+        <span id="score-text">得分 0</span>
+      </div>
       <button id="pause-btn" title="菜单 / 暂停">☰</button>
     </div>
     <canvas id="game-canvas" width="960" height="600"></canvas>
@@ -38,6 +41,7 @@
       <h1 id="result-title"></h1>
       <p id="result-text"></p>
       <button id="restart-btn">再来一局</button>
+      <button id="checkpoint-btn" class="hidden">从检查点继续</button>
     </div>
     <div id="pause-overlay" class="overlay hidden">
       <h1>⏸ 暂停</h1>
@@ -55,6 +59,7 @@
     </div>
   </div>
   <script src="js/config.js"></script>
+  <script src="js/save.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/plants.js"></script>
   <script src="js/zombies.js"></script>

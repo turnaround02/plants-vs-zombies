@@ -67,19 +67,28 @@ class Plant {
     if (this.fireTimer >= this.type.fireInterval) {
       this.fireTimer = 0;
       const shots = this.type.shotsPerFire || 1;
-      for (let i = 0; i < shots; i++) {
-        game.spawnProjectile({
-           x: this.x + 20,
-           y: this.y - 5,
-           row: this.row,
-           damage: this.type.damage,
-           speed: this.type.projectileSpeed,
-           slowFactor: this.type.slowFactor || 0,
-           slowDuration: this.type.slowDuration || 0,
-           color: this.type.slowFactor ? '#b3e5fc' : (this.type.charm ? '#ce93d8' : '#66bb6a'),
-           penetrate: this.type.penetrate || false,
-           charm: this.type.charm || false,
-         });
+      // 双射豌豆：同时覆盖本行与相邻行
+      const targetRows = this.type.dualRow
+        ? [this.row, this.row + 1]
+        : [this.row];
+      for (const tRow of targetRows) {
+        if (tRow >= CONFIG.ROWS) continue;
+        for (let i = 0; i < shots; i++) {
+          const bulletColor = this.type.projectileColor
+            || (this.type.slowFactor ? '#b3e5fc' : (this.type.charm ? '#ce93d8' : '#66bb6a'));
+          game.spawnProjectile({
+            x: this.x + 20,
+            y: this.y - 5,
+            row: tRow,
+            damage: this.type.damage,
+            speed: this.type.projectileSpeed,
+            slowFactor: this.type.slowFactor || 0,
+            slowDuration: this.type.slowDuration || 0,
+            color: bulletColor,
+            penetrate: this.type.penetrate || false,
+            charm: this.type.charm || false,
+          });
+        }
       }
       Sound.shoot();
     }
@@ -133,7 +142,11 @@ class Plant {
         this.renderSunflower(ctx, x, y + bob);
         break;
       case 'shooter':
-        if (this.type.penetrate) {
+        if (this.typeId === 'mushroomShooter') {
+          this.renderMushroom(ctx, x, y + bob);
+        } else if (this.typeId === 'dualPea') {
+          this.renderDualPea(ctx, x, y + bob);
+        } else if (this.type.penetrate) {
           this.renderCatTail(ctx, x, y + bob);
         } else if (this.type.charm) {
           this.renderChaosShroom(ctx, x, y + bob);
@@ -152,8 +165,8 @@ class Plant {
         break;
     }
 
-    // 血条(受伤时显示)
-    if (this.hp < this.maxHp) {
+    // 血条(常驻)
+    {
       const barW = 40;
       const barH = 5;
       const barX = x - barW / 2;
@@ -259,6 +272,59 @@ class Plant {
       ctx.textAlign = 'center';
       ctx.fillText('×2', x, y + 24);
     }
+  }
+
+  renderMushroom(ctx, x, y) {
+    // 蘑菇主体
+    ctx.fillStyle = '#8d6e63';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 10, 16, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // 蘑菇帽
+    ctx.fillStyle = '#d7ccc8';
+    ctx.beginPath();
+    ctx.arc(x, y, 14, Math.PI, 0);
+    ctx.fill();
+    // 帽点
+    ctx.fillStyle = '#a1887f';
+    ctx.beginPath();
+    ctx.arc(x - 6, y - 4, 3, 0, Math.PI * 2);
+    ctx.arc(x + 5, y - 6, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // 眼睛
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(x - 4, y + 2, 2, 0, Math.PI * 2);
+    ctx.arc(x + 4, y + 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  renderDualPea(ctx, x, y) {
+    // 双管豌豆：两个并列炮管
+    ctx.strokeStyle = '#2e7d32';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 15);
+    ctx.lineTo(x, y + 30);
+    ctx.stroke();
+    const isDual = true;
+    ctx.fillStyle = '#43a047';
+    ctx.beginPath();
+    ctx.arc(x, y, 15, 0, Math.PI * 2);
+    ctx.fill();
+    // 双炮管
+    ctx.fillStyle = '#388e3c';
+    ctx.fillRect(x + 6, y - 10, 18, 8);
+    ctx.fillRect(x + 6, y + 2, 18, 8);
+    ctx.beginPath();
+    ctx.arc(x + 24, y - 6, 5, 0, Math.PI * 2);
+    ctx.arc(x + 24, y + 6, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // 闪电标记
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚡', x, y + 24);
   }
 
   renderCatTail(ctx, x, y) {
