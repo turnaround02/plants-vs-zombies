@@ -78,6 +78,8 @@ class UI {
     this.checkpointBtn.addEventListener('click', () => {
       Sound.click();
       if (this.game.restoreCheckpoint(this.currentLevel)) {
+        // 恢复成功：隐藏结果覆盖层与检查点按钮，让玩家继续游玩
+        this.resultOverlay.classList.add('hidden');
         this.checkpointBtn.classList.add('hidden');
       }
     });
@@ -147,6 +149,7 @@ class UI {
     this.pauseOverlay.classList.remove('hidden');
     document.getElementById('pause-menu').classList.add('hidden');
     document.getElementById('level-select').classList.remove('hidden');
+    this.buildLevelGrid(); // 每次打开时读取最新存档，刷新解锁状态
   }
 
   closeLevelSelect() {
@@ -267,12 +270,16 @@ class UI {
       this.restartBtn.textContent = '再来一局';
       this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
       this.restartBtn.title = '';
-      // 若存在检查点则显示"从检查点继续"按钮
+      // 若当前关卡存在检查点则显示"从检查点继续"按钮（检查点随关卡中段自动保存）
       if (SaveStore.loadCheckpoint(this.currentLevel)) {
         this.checkpointBtn.classList.remove('hidden');
       } else {
         this.checkpointBtn.classList.add('hidden');
       }
+    } else if (data.state === 'playing') {
+      // 进入/恢复 playing 时隐藏结果覆盖层与检查点按钮
+      this.resultOverlay.classList.add('hidden');
+      this.checkpointBtn.classList.add('hidden');
     }
 
     // 放置植物后开始冷却

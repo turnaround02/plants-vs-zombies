@@ -520,23 +520,27 @@ class Game {
 
   updateMowers(dt) {
     for (const m of this.mowers) {
-      if (m.spent) continue;
-      if (!m.active) {
-        const trigger = this.zombies.some(z => z.row === m.row && !z.dead && !z.isAlly && z.x < CONFIG.MOWER_TRIGGER_X);
-        if (trigger) {
-          m.active = true;
+      // 未触发的割草机：僵尸越过触发线时一次性清掉整行所有僵尸
+      if (!m.spent) {
+        const triggered = this.zombies.some(z => z.row === m.row && !z.dead && !z.isAlly && z.x < CONFIG.MOWER_TRIGGER_X);
+        if (triggered) {
           m.spent = true;
+          m.active = true;
           m.x = CONFIG.MOWER_START_X;
+          // 立即清整行保险：所有该行的敌方僵尸被消灭
+          for (const z of this.zombies) {
+            if (z.row === m.row && !z.dead && !z.isAlly) {
+              z.dead = true;
+              z.alive = false;
+              this.recordKill(z.typeId);
+            }
+          }
+          Sound.zombieDie();
         }
       }
+      // 触发的割草机仅做向右驶出的动画（伤害已在触发瞬间结算）
       if (m.active) {
         m.x += CONFIG.MOWER_SPEED * (dt / 1000);
-        for (const z of this.zombies) {
-          if (z.row === m.row && !z.dead && z.x <= m.x + 25) {
-            z.takeDamage(CONFIG.MOWER_DAMAGE);
-            if (z.dead) this.recordKill(z.typeId);
-          }
-        }
         if (m.x > CONFIG.CANVAS_WIDTH + 50) m.active = false;
       }
     }

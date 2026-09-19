@@ -372,19 +372,35 @@ async function runTests() {
       if (!Array.isArray(game.mowers) || game.mowers.length !== CONFIG.ROWS) {
         return { ok: false, reason: `割草机数量错误: ${game.mowers ? game.mowers.length : 'undefined'}` };
       }
-      // 2. 强制触发某行割草机并验证清行（用真实僵尸对象）
+      // 2. 强制触发某行割草机并验证清整行（含后方僵尸）
       const row = 0;
       game.zombies = [];
-      game.spawnZombie('normal', row);
-      game.zombies[0].x = 50; // 越过触发线
+      game.spawnZombie('normal', row); game.zombies[0].x = 50;   // 越过触发线
+      game.spawnZombie('normal', row); game.zombies[1].x = 150;  // 后方未越线
+      game.spawnZombie('normal', row); game.zombies[2].x = 300;  // 更后方
       game.updateMowers(100);
       const mower = game.mowers[row];
-      const zombieDead = game.zombies[0].dead === true;
-      // 3. 割草机一次性：触发后 spent=true 不会再次激活
-      return { ok: mower.spent === true && zombieDead, mower, zombieDead };
+      const remainingRowZombies = game.zombies.filter(z => z.row === row && !z.dead).length;
+      // 3. 割草机触发后应清整行且保持 playing 状态
+      return { ok: mower.spent === true && remainingRowZombies === 0 && game.state === 'playing', remainingRowZombies, state: game.state };
     });
     console.log('  割草机状态:', JSON.stringify(mowerState));
-    if (!mowerState.ok) throw new Error(`割草机机制异常: ${mowerState.reason || '触发后未清行或未标记 spent'}`);
+    if (!mowerState.ok) throw new Error(`割草机机制异常: ${mowerState.reason || JSON.stringify(mowerState)}`);
+
+    // ==========================================
+    // 测试 10b: 割草机清除后不应触发失败
+    // ==========================================
+    const mowerNoLose = await page.evaluate(() => {
+      const game = window.__game;
+      game.startLevel(1);
+      game.zombies = [];
+      game.spawnZombie('normal', 1); game.zombies[0].x = 55; // 越过触发线 80 但 > HOUSE_X 60
+      game.mowers[1].spent = false;
+      game.updateMowers(100);
+      return { ok: game.state === 'playing' && !game.zombies.some(z => z.row === 1 && !z.dead), state: game.state };
+    });
+    console.log('  割草机清整行后不触发失败:', JSON.stringify(mowerNoLose));
+    if (!mowerNoLose.ok) throw new Error('割草机清整行后游戏不应失败!');
 
     // ==========================================
     // 测试 11: 铲子机制
@@ -416,6 +432,34 @@ async function runTests() {
       return !game.selectedPlant;
     });
     if (!shovelBtnOk) throw new Error('铲子按钮不存在或切换异常!');
+
+    // ==========================================
+    // 测试 12: 检查点恢复
+    // ==========================================
+    console.log('\n📋 测试 12: 检查点恢复');
+    const cpResult = await page.evaluate(() => {
+      const game = window.__game;
+      // 1. 保存一个检查点
+      SaveStore.saveCheckpoint(1, 1, 200,
+        [{ typeId: 'wallnut', row: 1, col: 3, hp: 400, maxHp: 400 }],
+        [{ typeId: 'normal', row: 1, x: 500, hp: 100, maxHp: 100 }]
+      );
+      const hadCp = !!SaveStore.loadCheckpoint(1);
+      // 2. 模拟失败后恢复
+      game.state = 'lose';
+      game.emitStateChange();
+      const restored = game.restoreCheckpoint(1);
+      const overlayHidden = document.getElementById('result-overlay').classList.contains('hidden');
+      const state = game.state;
+      const plantCount = game.plants.length;
+      const zombieCount = game.zombies.length;
+      return {
+        ok: hadCp && restored && overlayHidden && state === 'playing' && plantCount === 1 && zombieCount === 1,
+        hadCp, restored, overlayHidden, state, plantCount, zombieCount,
+      };
+    });
+    console.log('  检查点恢复:', JSON.stringify(cpResult));
+    if (!cpResult.ok) throw new Error(`检查点恢复异常: ${JSON.stringify(cpResult)}`);
 
     // ==========================================
     // 汇总
