@@ -139,7 +139,14 @@ class UI {
       const level = LEVELS[id];
       const btn = document.createElement('button');
       btn.className = 'level-btn';
-      btn.innerHTML = `<span>第 ${id} 关</span><span class="level-name">${level.name}</span>`;
+      const unlocked = SaveStore.isLevelUnlocked(id);
+      btn.innerHTML = unlocked
+        ? `<span>第 ${id} 关</span><span class="level-name">${level.name}</span>`
+        : `<span>🔒 第 ${id} 关</span><span class="level-name">${level.name}</span>`;
+      if (!unlocked) {
+        btn.disabled = true;
+        btn.classList.add('locked');
+      }
       btn.addEventListener('click', () => {
         Sound.click();
         this.currentLevel = parseInt(id);
@@ -210,16 +217,17 @@ class UI {
       const levelName = LEVELS[this.currentLevel] ? LEVELS[this.currentLevel].name : '关卡';
       this.resultTitle.textContent = '🎉 胜利！';
       this.resultTitle.className = 'win';
+      const stats = `得分 ${this.game.score} · 击杀 ${this.game.kills} · 过关奖励 +${this.game.lastBonus || 0}`;
       const nextLevel = this.currentLevel + 1;
       const hasMore = nextLevel <= this.totalLevels;
       if (hasMore) {
-        this.resultText.textContent = `成功完成「${levelName}」！\n点击下方按钮挑战下一关，或重玩本关。`;
+        this.resultText.textContent = `成功完成「${levelName}」！\n${stats}\n点击下方按钮挑战下一关，或重玩本关。`;
         this.restartBtn.textContent = '下一关 ▶';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #ff9800, #f57c00)';
         this.restartBtn.title = `挑战第 ${nextLevel} 关`;
         this.currentLevel = nextLevel;
       } else {
-        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n你是植物大师！🌟`;
+        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n${stats}\n你是植物大师！🌟`;
         this.restartBtn.textContent = '再来一局';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
         this.restartBtn.title = '从头开始';

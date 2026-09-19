@@ -385,3 +385,13 @@ body {
   font-weight: bold;
   font-size: 14px;
 }
+
+/* 锁定关卡样式 */
+.level-btn.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+.level-btn.locked:disabled {
+  background: #555;
+}
