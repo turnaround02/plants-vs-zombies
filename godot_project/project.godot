@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.7")
 Input="res://InputManager.gd"
 PlantTypes="res://PlantTypes.gd"
 ZombieTypes="res://ZombieTypes.gd"
+Levels="res://Levels.gd"
 
 [rendering]
 
