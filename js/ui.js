@@ -21,6 +21,7 @@ class UI {
     this.resultText = document.getElementById('result-text');
     this.startBtn = document.getElementById('start-btn');
     this.restartBtn = document.getElementById('restart-btn');
+    this.checkpointBtn = document.getElementById('checkpoint-btn');
     this.pauseBtn = document.getElementById('pause-btn');
     this.levelInfoEl = document.getElementById('level-info');
     this.resumeBtn = document.getElementById('resume-btn');
@@ -70,6 +71,13 @@ class UI {
       Sound.click();
       this.updateLevelInfo();
       this.game.startLevel(this.currentLevel);
+    });
+
+    this.checkpointBtn.addEventListener('click', () => {
+      Sound.click();
+      if (this.game.restoreCheckpoint(this.currentLevel)) {
+        this.checkpointBtn.classList.add('hidden');
+      }
     });
 
     this.pauseBtn.addEventListener('click', () => {
@@ -217,6 +225,7 @@ class UI {
       const levelName = LEVELS[this.currentLevel] ? LEVELS[this.currentLevel].name : '关卡';
       this.resultTitle.textContent = '🎉 胜利！';
       this.resultTitle.className = 'win';
+      this.checkpointBtn.classList.add('hidden');
       const stats = `得分 ${this.game.score} · 击杀 ${this.game.kills} · 过关奖励 +${this.game.lastBonus || 0}`;
       const nextLevel = this.currentLevel + 1;
       const hasMore = nextLevel <= this.totalLevels;
@@ -241,6 +250,12 @@ class UI {
       this.restartBtn.textContent = '再来一局';
       this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
       this.restartBtn.title = '';
+      // 若存在检查点则显示"从检查点继续"按钮
+      if (SaveStore.loadCheckpoint(this.currentLevel)) {
+        this.checkpointBtn.classList.remove('hidden');
+      } else {
+        this.checkpointBtn.classList.add('hidden');
+      }
     }
 
     // 放置植物后开始冷却

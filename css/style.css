@@ -395,3 +395,14 @@ body {
 .level-btn.locked:disabled {
   background: #555;
 }
+
+#checkpoint-btn {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background: linear-gradient(to bottom, #26c6da, #00acc1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}

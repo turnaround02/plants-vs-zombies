@@ -14,17 +14,17 @@ class LevelManager {
     this.allWavesComplete = false;
   }
 
-  start() {
+  start(game) {
     this.waveIndex = 0;
     this.waveState = 'idle';
     this.spawnQueue = [];
     this.spawnTimer = 0;
     this.waveBreakTimer = 0;
     this.allWavesComplete = false;
-    this.startNextWave();
+    this.startNextWave(game);
   }
 
-  startNextWave() {
+  startNextWave(game) {
     if (this.waveIndex >= this.totalWaves) {
       this.allWavesComplete = true;
       this.waveState = 'complete';
@@ -32,6 +32,16 @@ class LevelManager {
     }
 
     const wave = this.level.waves[this.waveIndex];
+    // 关卡中段保存检查点（玩家失败后可从该点继续）
+    if (game && this.waveIndex === Math.floor(this.totalWaves / 2)) {
+      SaveStore.saveCheckpoint(
+        this.level.id,
+        this.waveIndex,
+        game.sun,
+        game.plants.map(p => ({ typeId: p.typeId, row: p.row, col: p.col, hp: p.hp, maxHp: p.maxHp })),
+        game.zombies.map(z => ({ typeId: z.typeId, row: z.row, x: z.x, hp: z.hp, maxHp: z.maxHp }))
+      );
+    }
     this.spawnQueue = wave.zombies.map(z => ({ ...z }));
     this.spawnQueue.sort((a, b) => a.delay - b.delay);
     this.spawnTimer = 0;
@@ -47,7 +57,7 @@ class LevelManager {
         this.waveBreakTimer += dt;
         if (this.waveBreakTimer >= CONFIG.WAVE_BREAK_INTERVAL) {
           this.waveBreakTimer = 0;
-          this.startNextWave();
+          this.startNextWave(game);
         }
         break;
 

@@ -51,5 +51,29 @@ const SaveStore = (() => {
     return levelId <= p.unlockedLevel;
   }
 
-  return { load, getProgress, addClearScore, recordWin, recordKill, isLevelUnlocked };
+  // 检查点存档：关卡中段自动保存，失败后可恢复
+  function saveCheckpoint(levelId, waveIndex, sun, plants, zombies) {
+    const s = load() || { checkpoints: {} };
+    s.checkpoints = s.checkpoints || {};
+    s.checkpoints[levelId] = {
+      waveIndex, sun, plants, zombies, ts: Date.now(),
+    };
+    localStorage.setItem(KEY, JSON.stringify(s));
+  }
+
+  function loadCheckpoint(levelId) {
+    const s = load();
+    if (!s || !s.checkpoints || !s.checkpoints[levelId]) return null;
+    return s.checkpoints[levelId];
+  }
+
+  function clearCheckpoint(levelId) {
+    const s = load();
+    if (s && s.checkpoints && s.checkpoints[levelId]) {
+      delete s.checkpoints[levelId];
+      localStorage.setItem(KEY, JSON.stringify(s));
+    }
+  }
+
+  return { load, getProgress, addClearScore, recordWin, recordKill, isLevelUnlocked, saveCheckpoint, loadCheckpoint, clearCheckpoint };
 })();
