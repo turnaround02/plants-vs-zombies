@@ -1,6 +1,9 @@
 extends Node2D
 
-# Zombie stats
+# 僵尸类型 ID（"normal" / "cone" / "runner" / "bucket" / "pole_vault" / "newspaper"）
+@export var type_id: String = "normal"
+
+# Zombie stats（默认值，若指定 type_id 则从 ZombieTypes 覆盖）
 @export var speed: float = 25.0       # slightly slower
 @export var hp: int = 5               # increased from 3
 @export var max_hp: int = 5
@@ -16,11 +19,23 @@ var target_plant: Node = null
 var _hit_flash_timer: float = 0.0
 var _dead: bool = false
 var _death_timer: float = 0.0
+var score: int = 0                    # 击杀得分
 
 func _ready() -> void:
     add_to_group("zombies")
+    _apply_type()
     _sprite = get_node("Sprite")
     _make_placeholder()
+
+## 按 type_id 从 ZombieTypes 单例覆盖属性
+func _apply_type() -> void:
+    var t: Dictionary = ZombieTypes.get_type(type_id)
+    max_hp = t.get("hp", max_hp)
+    hp = max_hp
+    speed = t.get("speed", speed)
+    attack_interval = t.get("attack_interval", attack_interval)
+    attack_damage = t.get("damage", attack_damage)
+    score = t.get("score", 0)
 
 func _make_placeholder() -> void:
     var img := Image.create(30, 60, false, Image.FORMAT_RGBA8)
