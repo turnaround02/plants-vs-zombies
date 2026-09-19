@@ -68,7 +68,8 @@ func _ready() -> void:
         else:
             push_error("Could not find SunLabel in HUD")
         if hud_wave_label:
-            hud_wave_label.text = "Wave: " + str(wave_number)
+            # 关卡系统下初始显示第 1 关第 1 波（与 _reset_level_state 保持一致）
+            hud_wave_label.text = "关卡 1 波次 1/" + str(Levels.get_level(1)["waves"].size())
         else:
             push_error("Could not find WaveLabel in HUD")
         if hud_score_label:
