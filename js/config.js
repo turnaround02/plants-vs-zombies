@@ -760,4 +760,59 @@ const LEVELS = {
       },
     ],
   },
+  9: {
+    id: 9,
+    name: '第九关：夜幕降临',
+    startSun: 150,
+    night: true, // 夜间关卡：天空不掉阳光，开局送 150 阳光
+    waves: [
+      {
+        // 第1波: 铁桶 + 撑杆 + 读报混合
+        zombies: [
+          { type: 'bucket', delay: 0 },
+          { type: 'poleVault', delay: 1500 },
+          { type: 'newspaper', delay: 3000 },
+          { type: 'bucket', delay: 4500 },
+          { type: 'runner', delay: 6000 },
+          { type: 'poleVault', delay: 7500 },
+          { type: 'newspaper', delay: 9000 },
+        ],
+      },
+      {
+        // 第2波: 铁桶 + 撑杆 + 读报 + 路障
+        zombies: [
+          { type: 'bucket', delay: 0 },
+          { type: 'poleVault', delay: 1000 },
+          { type: 'newspaper', delay: 2000 },
+          { type: 'bucket', delay: 3000 },
+          { type: 'runner', delay: 4000 },
+          { type: 'poleVault', delay: 5000 },
+          { type: 'newspaper', delay: 6000 },
+          { type: 'cone', delay: 7000 },
+          { type: 'bucket', delay: 8000 },
+          { type: 'poleVault', delay: 9000 },
+          { type: 'newspaper', delay: 10000 },
+        ],
+      },
+      {
+        // 第3波: 最终波，混合大军
+        zombies: [
+          { type: 'bucket', delay: 0 },
+          { type: 'poleVault', delay: 700 },
+          { type: 'newspaper', delay: 1400 },
+          { type: 'bucket', delay: 2100 },
+          { type: 'runner', delay: 2800 },
+          { type: 'poleVault', delay: 3500 },
+          { type: 'newspaper', delay: 4200 },
+          { type: 'bucket', delay: 4900 },
+          { type: 'runner', delay: 5600 },
+          { type: 'poleVault', delay: 6300 },
+          { type: 'cone', delay: 7000 },
+          { type: 'newspaper', delay: 7700 },
+          { type: 'bucket', delay: 8400 },
+          { type: 'poleVault', delay: 9100 },
+        ],
+      },
+    ],
+  },
 };
