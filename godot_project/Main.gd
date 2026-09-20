@@ -40,6 +40,9 @@ var selected_plant_type: String = ""
 # Dictionary to track occupied cells: key = "x,y", value = Node instance
 var occupied_cells: Dictionary = {}
 
+# 视口宽度（天空掉阳光 / 僵尸生成位置用）
+const VIEWPORT_WIDTH: float = 960.0
+
 # 关卡系统（按 Levels 单例的 8 关数据生成波次，最后一波清空后胜利）
 var current_level_id: int = 1
 var current_wave_index: int = 0
@@ -152,7 +155,7 @@ func _process(delta: float) -> void:
     _update_wave(delta)
 
 func spawn_sun_from_sky() -> void:
-    var x: float = randf() * size.x
+    var x: float = randf() * VIEWPORT_WIDTH
     var sun_instance: Node2D = preload("res://scenes/Sun.tscn").instantiate()
     sun_instance.position = Vector2(x, -20)
     sun_instance.sun_amount = sun_fall_amount
@@ -178,7 +181,7 @@ func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseButton and event.pressed:
         # 铲子模式优先：点击植物即铲除（回收 50% 阳光）
         if shovel_mode and event.button_index == MOUSE_BUTTON_LEFT:
-            var wp: Vector2 = Input.get_world_2d_position(get_viewport().get_camera_2d())
+            var wp: Vector2 = Input.get_mouse_position()
             var gcoord: Vector2 = grid.world_to_grid(wp) if grid else Vector2(-1, -1)
             if gcoord.x >= 0 and gcoord.y >= 0:
                 var key: String = str(gcoord.x) + "," + str(gcoord.y)
@@ -195,7 +198,7 @@ func _unhandled_input(event: InputEvent) -> void:
             return
         # handle left button
     if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-        var world_pos: Vector2 = Input.get_world_2d_position(get_viewport().get_camera_2d())
+        var world_pos: Vector2 = Input.get_mouse_position()
         print("Left click at world:", world_pos)
         if selected_plant_type != "" and grid:
             var grid_coord: Vector2 = grid.world_to_grid(world_pos)
@@ -231,7 +234,7 @@ func _try_place_plant(x: int, y: int) -> void:
     # Reset selected
     selected_plant_type = ""
     # Connect plant exiting signal to clean up occupied_cells
-    plant_instance.connect("tree_exiting", Callable(self, "_on_plant_exited", key))
+    plant_instance.connect("tree_exiting", Callable(self, "_on_plant_exited").bind(key))
 
 ## 重置为第 1 关的初始状态
 func _reset_level_state() -> void:
@@ -399,13 +402,13 @@ func spawn_zombie(zombie_type: String = "normal") -> void:
     zombie_instance.row_index = row
     if zombie_instance.has_method("set_type") or "type_id" in zombie_instance:
         zombie_instance.type_id = zombie_type
-    var start_x = size.x + 30
+    var start_x = VIEWPORT_WIDTH + 30
     var y = grid.grid_to_world(Vector2(0, row)).y - grid.cell_height / 2
     zombie_instance.position = Vector2(start_x, y)
     add_child(zombie_instance)
     zombies_alive += 1
     # 传入僵尸实例，以便在 tree_exiting 时判断是否被击杀并累计得分
-    zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited", [zombie_instance]))
+    zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited").bind(zombie_instance))
 
 func _on_zombie_exited(zombie: Node) -> void:
     zombies_alive -= 1
@@ -455,7 +458,7 @@ func _remove_plant_with_refund(key: String) -> void:
     if plant == null or not plant.is_instance_valid():
         occupied_cells.erase(key)
         return
-    var cost: int = int(PlantTypes.get_type(plant.get("type_id", "")).get("cost", 0))
+    var cost: int = int(PlantTypes.get_type(plant.type_id).get("cost", 0))
     sun += int(cost * 0.5)
     emit_signal("sun_changed", sun)
     plant.queue_free()
@@ -476,8 +479,8 @@ func zombie_reached(row: int = -1) -> void:
 ## 小推车触发：清除本行全部僵尸（计入得分）
 func _clear_row_zombies(row: int) -> void:
     for z in get_tree().get_nodes_in_group("zombies"):
-        if z.get("row_index") == row:
-            record_kill(z.get("type_id", "normal"))
+        if z.row_index == row:
+            record_kill(z.type_id)
             z.queue_free()
     zombies_alive = 0
 
@@ -489,18 +492,18 @@ func _save_checkpoint() -> void:
     var plants_arr: Array = []
     for p in get_tree().get_nodes_in_group("plants"):
         plants_arr.append({
-            "type": p.get("type_id", ""),
-            "row": p.get("row", 0),
-            "col": p.get("col", 0),
+            "type": p.type_id,
+            "row": p.row,
+            "col": p.col,
         })
     var zombies_arr: Array = []
     for z in get_tree().get_nodes_in_group("zombies"):
-        if not z.get("_dead", false):
+        if not z._dead:
             zombies_arr.append({
-                "type": z.get("type_id", "normal"),
-                "row": z.get("row_index", 0),
+                "type": z.type_id,
+                "row": z.row_index,
                 "x": z.position.x,
-                "hp": z.get("hp", 0),
+                "hp": z.hp,
             })
     var data := {
         "level_id": current_level_id,
@@ -571,7 +574,7 @@ func _load_checkpoint() -> void:
             zombie_instance.hp = int(zdata["hp"])
         add_child(zombie_instance)
         zombies_alive += 1
-        zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited", [zombie_instance]))
+        zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited").bind(zombie_instance))
     # 重新开始波次
     game_started = true
     call_deferred("_start_wave_prepare")

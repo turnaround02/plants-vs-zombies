@@ -116,7 +116,8 @@ func _process(delta: float) -> void:
 func _process_ally(delta: float) -> void:
     position.x += speed * delta
     var main = get_tree().root.get_node("Main")
-    if main and main.get("size") and position.x >= main.size.x + 50:
+    var view_w: float = get_viewport().get_visible_rect().size.x
+    if position.x >= view_w + 50:
         queue_free()
         return
     attack_timer += delta
@@ -143,9 +144,9 @@ func _find_ally_target() -> Node:
     var best: Node = null
     var best_dist: float = 1e9
     for z in zombies:
-        if z == self or z.get("_dead", false) or z.get("is_ally", false):
+        if z == self or z._dead or z.is_ally:
             continue
-        if z.get("row_index") != row_index:
+        if z.row_index != row_index:
             continue
         if z.position.x < position.x:
             continue

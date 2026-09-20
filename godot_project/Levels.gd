@@ -470,6 +470,7 @@ var levels: Dictionary = {
                         ],
                 ],
         },
+}
 
 ## 获取指定关卡数据（id 不存在时返回空 dict，调用方应检查）
 func get_level(id: int) -> Dictionary:
