@@ -27,8 +27,9 @@ const SaveStore = (() => {
 
   function addClearScore(levelId, score) {
     const s = load() || { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
-    s.totalScore += score;
-    s.unlockedLevel = Math.max(s.unlockedLevel, Math.min(levelId + 1, Object.keys(LEVELS).length));
+    // 兼容仅含 checkpoints 的存档（如中途保存检查点后通关），缺失字段需初始化，避免 NaN
+    s.totalScore = (s.totalScore || 0) + score;
+    s.unlockedLevel = Math.max(s.unlockedLevel || 1, Math.min(levelId + 1, Object.keys(LEVELS).length));
     s.bestScores = s.bestScores || {};
     s.bestScores[levelId] = Math.max(s.bestScores[levelId] || 0, score);
     localStorage.setItem(KEY, JSON.stringify(s));

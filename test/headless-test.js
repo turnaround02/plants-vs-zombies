@@ -54,7 +54,8 @@ function startServer() {
   });
 
   return new Promise((resolve) => {
-    server.listen(PORT, () => resolve(server));
+    // 仅绑定 IPv4 回环地址，避免与系统代理(如 Clash Verge)在 IPv6 :: 上的端口占用冲突
+    server.listen(PORT, '127.0.0.1', () => resolve(server));
   });
 }
 
@@ -460,6 +461,41 @@ async function runTests() {
     });
     console.log('  检查点恢复:', JSON.stringify(cpResult));
     if (!cpResult.ok) throw new Error(`检查点恢复异常: ${JSON.stringify(cpResult)}`);
+
+    // ==========================================
+    // 测试 13: 夜间关卡核心逻辑
+    // ==========================================
+    console.log('\n📋 测试 13: 夜间关卡核心逻辑');
+    const nightResult = await page.evaluate(() => {
+      const game = window.__game;
+      // 1. 第9关应标记为夜间
+      const level9 = LEVELS[9];
+      if (!level9 || level9.night !== true) {
+        return { ok: false, reason: '第9关未标记为夜间' };
+      }
+      // 2. 进入第9关，开局阳光应为 150
+      game.startLevel(9);
+      if (game.sun !== 150) {
+        return { ok: false, reason: `第9关开局阳光应为150, 实际 ${game.sun}` };
+      }
+      // 3. 夜间关卡在 SUN_FALL_INTERVAL 时间内不应生成天空阳光
+      game.suns = [];
+      game.sunFallTimer = 0;
+      game.update(CONFIG.SUN_FALL_INTERVAL + 100);
+      const skySuns = game.suns.filter(s => s.source === 'sky').length;
+      if (skySuns > 0) {
+        return { ok: false, reason: `夜间关卡不应生成天空阳光, 实际 ${skySuns}` };
+      }
+      // 4. 通关第9关后解锁状态正确
+      SaveStore.addClearScore(9, 1000);
+      const unlocked = SaveStore.isLevelUnlocked(9);
+      return { ok: unlocked, unlocked };
+    });
+    console.log('  夜间关卡:', JSON.stringify(nightResult));
+    if (!nightResult.ok) throw new Error(`夜间关卡异常: ${nightResult.reason || JSON.stringify(nightResult)}`);
+
+    await page.screenshot({ path: path.join(SHOT_DIR, '13-night-level.png') });
+    console.log('  ✅ 夜间关卡截图已保存: test/screenshots/13-night-level.png');
 
     // ==========================================
     // 汇总
