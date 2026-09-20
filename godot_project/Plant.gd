@@ -143,21 +143,29 @@ func _do_explosion() -> void:
             z.take_damage(damage)
     queue_free()
 
-# 魅惑：找到相邻的僵尸并将其转换为友方（向右行走）
+# 魅惑：找到相邻最近的一只僵尸并将其转换为友方（向右行走）
 func _do_charm() -> void:
     var main = get_tree().get_first_node_in_group("main")
     if main == null:
         return
+    var charm_radius: float = 40.0
+    var best: Node = null
+    var best_dist: float = 1e9
     for z in main.get_zombies():
-        if z.get("_dead", false):
+        if z.get("_dead", false) or z.get("is_ally", false):
             continue
-        if z.get("row_index") == row and z.position.distance_to(position) < 40.0:
-            # 魅惑：让僵尸转为友方（向右侧行走）
-            if z.has_method("set_charmed"):
-                z.set_charmed(true)
-            elif z.has_method("charm"):
-                z.charm()
-            break
+        if z.get("row_index") != row:
+            continue
+        var dist: float = z.position.distance_to(position)
+        if dist <= charm_radius and dist < best_dist:
+            best_dist = dist
+            best = z
+    if best != null:
+        # 魅惑：让僵尸转为友方（向右侧行走）
+        if best.has_method("set_charmed"):
+            best.set_charmed(true)
+        elif best.has_method("charm"):
+            best.charm()
     queue_free()
 
 func _make_placeholder() -> void:
@@ -179,7 +187,17 @@ func _get_target_zombie() -> Node:
     var main = get_tree().get_first_node_in_group("main")
     if main == null:
         return null
+    # 取本行射程内距离最近的活僵尸（与浏览器版 getFirstZombieInRow 语义对齐，修复"返回行内第一只"的截断 bug）
+    var shot_range: float = type.get("shot_range", 400.0)
+    var best: Node = null
+    var best_dist: float = 1e9
     for z in main.get_zombies():
-        if z.get("row_index") == row and z.get("_dead", false) == false:
-            return z
-    return null
+        if z.get("row_index") != row or z.get("_dead", false):
+            continue
+        var dist: float = z.position.distance_to(position)
+        if dist > shot_range:
+            continue
+        if dist < best_dist:
+            best_dist = dist
+            best = z
+    return best
