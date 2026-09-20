@@ -130,13 +130,16 @@ class Game {
 
     this.gameTime += dt;
 
-    // 天空掉阳光
-    this.sunFallTimer += dt;
-    if (this.sunFallTimer >= CONFIG.SUN_FALL_INTERVAL) {
-      this.sunFallTimer = 0;
-      const x = CONFIG.GRID_OFFSET_X + 50 + Math.random() * (CONFIG.CANVAS_WIDTH - CONFIG.GRID_OFFSET_X - 100);
-      const y = -20;
-      this.spawnSun(x, y, CONFIG.SUN_FALL_AMOUNT, 'sky');
+    // 天空掉阳光（夜间关卡不掉自然阳光，仅靠植物生产）
+    const isNight = this.levelManager && this.levelManager.level && this.levelManager.level.night;
+    if (!isNight) {
+      this.sunFallTimer += dt;
+      if (this.sunFallTimer >= CONFIG.SUN_FALL_INTERVAL) {
+        this.sunFallTimer = 0;
+        const x = CONFIG.GRID_OFFSET_X + 50 + Math.random() * (CONFIG.CANVAS_WIDTH - CONFIG.GRID_OFFSET_X - 100);
+        const y = -20;
+        this.spawnSun(x, y, CONFIG.SUN_FALL_AMOUNT, 'sky');
+      }
     }
 
     // 更新植物
@@ -350,7 +353,34 @@ class Game {
   }
 
   renderBackground(ctx) {
-    // 草地背景
+    const isNight = this.levelManager && this.levelManager.level && this.levelManager.level.night;
+
+    if (isNight) {
+      // 夜间草地背景（深色）
+      const grad = ctx.createLinearGradient(0, 0, 0, CONFIG.CANVAS_HEIGHT);
+      grad.addColorStop(0, '#1a237e');
+      grad.addColorStop(1, '#0d1b2a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+
+      // 夜间天空区域(左侧房屋上方)
+      ctx.fillStyle = '#0b1026';
+      ctx.fillRect(0, 0, CONFIG.GRID_OFFSET_X, CONFIG.CANVAS_HEIGHT);
+
+      // 星空（随机小点 + 闪烁）
+      for (let i = 0; i < 80; i++) {
+        const x = (i * 137.5) % CONFIG.CANVAS_WIDTH;
+        const y = (i * 89.3) % CONFIG.CANVAS_HEIGHT;
+        const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(this.gameTime / 500 + i));
+        ctx.fillStyle = `rgba(255,255,255,${twinkle})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
+
+    // 白天草地背景
     const grad = ctx.createLinearGradient(0, 0, 0, CONFIG.CANVAS_HEIGHT);
     grad.addColorStop(0, '#7cb342');
     grad.addColorStop(1, '#558b2f');
