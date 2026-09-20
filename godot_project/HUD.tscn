@@ -32,3 +32,35 @@ text = "Score: 0"
 align = 0
 valign = 1
 custom_font_size = 24
+
+[node name="ShovelButton" type="Button" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -120
+offset_top = 10
+text = "铲子 🪏"
+
+[node name="PauseButton" type="Button" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240
+offset_top = 10
+text = "暂停 ⏸"
+
+[node name="PauseLabel" type="Label" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+offset_left = -100
+offset_top = -40
+offset_right = 100
+offset_bottom = 40
+text = "已暂停（Esc/P 继续）"
+horizontal_alignment = 1
+vertical_alignment = 1
+custom_font_size = 28

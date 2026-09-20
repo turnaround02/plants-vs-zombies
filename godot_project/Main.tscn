@@ -27,7 +27,46 @@ cell_height = 120
 rows = 5
 cols = 9
 grid_offset = Vector2(0, 60)
+[node name="NightSky" type="Node2D"]
 
+[node name="BackRect" type="ColorRect" parent="NightSky"]
+visible = false
+offset_right = 960.0
+offset_bottom = 600.0
+color = Color(0.05, 0.06, 0.13, 1)
+
+[node name="Stars" type="Node2D" parent="NightSky"]
+visible = false
+
+[node name="Star1" type="Label" parent="NightSky/Stars"]
+position = Vector2(80, 120)
+text = "✦"
+custom_font_size = 14
+
+[node name="Star2" type="Label" parent="NightSky/Stars"]
+position = Vector2(230, 90)
+text = "✦"
+custom_font_size = 10
+
+[node name="Star3" type="Label" parent="NightSky/Stars"]
+position = Vector2(410, 150)
+text = "✦"
+custom_font_size = 12
+
+[node name="Star4" type="Label" parent="NightSky/Stars"]
+position = Vector2(600, 100)
+text = "✦"
+custom_font_size = 10
+
+[node name="Star5" type="Label" parent="NightSky/Stars"]
+position = Vector2(760, 140)
+text = "✦"
+custom_font_size = 14
+
+[node name="Star6" type="Label" parent="NightSky/Stars"]
+position = Vector2(880, 95)
+text = "✦"
+custom_font_size = 12
 [node name="HUD" type="Node"]
 instance = ExtResource( 2 )
 

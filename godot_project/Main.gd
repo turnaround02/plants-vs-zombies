@@ -52,6 +52,7 @@ var wave_state: int = 0  # 0 = preparing(波次预告), 1 = spawning(按 delay �
 var wave_prepare_time: float = 2.0    # 波次预告/间歇时长（秒）
 var wave_prepare_timer: float = 0.0
 var game_won: bool = false
+var is_paused: bool = false   # 暂停标志（独立于关卡状态机）
 
 func _ready() -> void:
     add_to_group("main")
@@ -96,6 +97,14 @@ func _ready() -> void:
         menu.connect("start_pressed", Callable(self, "_on_start_pressed"))
     # Connect sun_changed signal to update label
     connect("sun_changed", Callable(self, "_on_sun_changed"))
+    # 连接铲子按钮（HUD 新增）
+    var shovel_btn = hud_node.get_node_or_null("ShovelButton") if hud_node else null
+    if shovel_btn:
+        shovel_btn.connect("pressed", Callable(self, "_on_shovel_pressed"))
+    # 连接暂停按钮（HUD 新增）
+    var pause_btn = hud_node.get_node_or_null("PauseButton") if hud_node else null
+    if pause_btn:
+        pause_btn.connect("pressed", Callable(self, "_toggle_pause"))
     # Emit initial sun change (will trigger the callback)
     emit_signal("sun_changed", sun)
     if plant_bar:
@@ -122,12 +131,14 @@ func _on_sun_changed(amount: int) -> void:
         plant_bar.update_affordability(sun)
 
 func _process(delta: float) -> void:
-    if not game_started:
+    if not game_started or is_paused:
         return
-    sun_fall_timer += delta
-    if sun_fall_timer >= sun_fall_interval:
-        sun_fall_timer = 0.0
-        spawn_sun_from_sky()
+    # 夜间关卡：天空不掉阳光（与浏览器版 isNightLevel 逻辑对齐）
+    if not current_level.get("night", false):
+        sun_fall_timer += delta
+        if sun_fall_timer >= sun_fall_interval:
+            sun_fall_timer = 0.0
+            spawn_sun_from_sky()
     _update_wave(delta)
 
 func spawn_sun_from_sky() -> void:
@@ -145,7 +156,27 @@ func add_sun(amount: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
     if not game_started:
         return
+    # 暂停热键：Esc / P
+    if event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode == KEY_ESCAPE or event.keycode == KEY_P:
+            _toggle_pause()
+            return
+        if event.keycode == KEY_1 and shovel_mode:
+            shovel_mode = false
+            print("Shovel mode cancelled")
+            return
     if event is InputEventMouseButton and event.pressed:
+        # 铲子模式优先：点击植物即铲除（回收 50% 阳光）
+        if shovel_mode and event.button_index == MOUSE_BUTTON_LEFT:
+            var wp: Vector2 = Input.get_world_2d_position(get_viewport().get_camera_2d())
+            var gcoord: Vector2 = grid.world_to_grid(wp) if grid else Vector2(-1, -1)
+            if gcoord.x >= 0 and gcoord.y >= 0:
+                var key: String = str(gcoord.x) + "," + str(gcoord.y)
+                if occupied_cells.has(key):
+                    _remove_plant_with_refund(key)
+                    shovel_mode = false
+                    return
+        if event.button_index == MOUSE_BUTTON_RIGHT:
         if event.button_index == MOUSE_BUTTON_RIGHT:
             selected_plant_type = ""
             print("Selection cleared")
@@ -212,6 +243,73 @@ func _reset_level_state() -> void:
     mowers_available = [true, true, true, true, true]
     _update_wave_label()
 
+## 暂停切换（键盘 Esc/P 或 HUD 按钮）
+func _toggle_pause() -> void:
+    is_paused = not is_paused
+    get_tree().paused = is_paused
+    _update_pause_overlay()
+    print("Paused: ", is_paused)
+
+## 暂停时显示提示（HUD 新增 PauseLabel）
+func _update_pause_overlay() -> void:
+    var hud = get_node_or_null("HUD")
+    if hud:
+        var lbl = hud.get_node_or_null("PauseLabel")
+        if lbl:
+            lbl.visible = is_paused
+
+## 关卡胜利后不再自动推进：显示结算 + 手动进入下一关（与浏览器版对齐）
+func _show_result_screen() -> void:
+    var result := Label.new()
+    result.name = "ResultLabel"
+    result.text = "第 " + str(current_level_id) + " 关完成！\n本关得分: " + str(score) + "\n奖励: " + str(last_bonus)
+    result.position = Vector2(280, 200)
+    result.size = Vector2(400, 150)
+    result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    add_child(result)
+    var btn_next := Button.new()
+    btn_next.name = "NextLevelButton"
+    var is_last: bool = current_level_id >= Levels.all_ids().size()
+    btn_next.text = "返回菜单" if is_last else "进入第 " + str(current_level_id + 1) + " 关"
+    btn_next.position = Vector2(430, 380)
+    add_child(btn_next)
+    btn_next.pressed.connect(_on_result_button)
+
+func _on_result_button() -> void:
+    var is_last: bool = current_level_id >= Levels.all_ids().size()
+    if not is_last:
+        _start_level(current_level_id + 1)
+
+## 从指定关卡 ID 开始（供胜利结算/关卡选择使用）
+func _start_level(level_id: int) -> void:
+    current_level_id = level_id
+    current_wave_index = 0
+    current_level = Levels.get_level(level_id)
+    current_wave = current_level["waves"][0]
+    game_won = false
+    sun = current_level.get("start_sun", sun_start)
+    emit_signal("sun_changed", sun)
+    mowers_available = [true, true, true, true, true]
+    for p in get_tree().get_nodes_in_group("plants"):
+        p.queue_free()
+    for z in get_tree().get_nodes_in_group("zombies"):
+        z.queue_free()
+    occupied_cells.clear()
+    zombies_alive = 0
+    call_deferred("_start_wave_prepare")
+
+## 夜间视觉：深色背景 + 静态星空
+func _apply_night_visuals() -> void:
+    var night: bool = current_level.get("night", false)
+    var bg: ColorRect = $Background
+    bg.color = Color(0.05, 0.06, 0.13) if night else Color(0.1, 0.3, 0.1)
+    var back_rect = get_node_or_null("NightSky/BackRect")
+    if back_rect:
+        back_rect.visible = night
+    var stars = get_node_or_null("NightSky/Stars")
+    if stars:
+        stars.visible = night
+
 ## 波次预告开始（显示关卡/波次信息后进入生成阶段）
 func _start_wave_prepare() -> void:
     wave_state = 0
@@ -220,6 +318,11 @@ func _start_wave_prepare() -> void:
     wave_spawn_timer = 0.0
     print("Preparing level ", current_level_id, " wave ", current_wave_index + 1, " of ", current_level["waves"].size())
     _update_wave_label()
+    # 中段（半波次）自动保存检查点（与浏览器版 level.js 对齐）
+    if current_wave_index == int(current_level["waves"].size() / 2):
+        _save_checkpoint()
+    # 夜间视觉切换
+    _apply_night_visuals()
 
 ## 波次状态机：预告 -> 按 delay 生成 -> 波次结束 -> 下一波/胜利
 func _update_wave(delta: float) -> void:
@@ -286,30 +389,8 @@ func _on_level_won() -> void:
     _save_progress()
     # 更新 HUD 并停止后续波次
     _update_wave_label()
-    # 胜利后进入下一关（若未到最后关），否则停留在胜利状态
-    if current_level_id < Levels.all_ids()[-1]:
-        current_level_id += 1
-        current_wave_index = 0
-        current_level = Levels.get_level(current_level_id)
-        current_wave = current_level["waves"][0]
-        game_won = false
-        sun = current_level.get("start_sun", sun)
-        emit_signal("sun_changed", sun)
-        # 清理残留单位后开始下一关
-        for p in get_tree().get_nodes_in_group("plants"):
-            p.queue_free()
-        for z in get_tree().get_nodes_in_group("zombies"):
-            z.queue_free()
-        for proj in get_tree().get_nodes_in_group("projectiles"):
-            proj.queue_free()
-        for sun_node in get_tree().get_nodes_in_group("suns"):
-            sun_node.queue_free()
-        occupied_cells.clear()
-        zombies_alive = 0
-        call_deferred("_start_wave_prepare")
-    else:
-        print("All levels cleared!")
-        _update_wave_label()
+    # 停止自动推进：显示结算画面，由玩家手动进入下一关（与浏览器版对齐）
+    _show_result_screen()
 
 ## 更新波次显示
 func _update_wave_label() -> void:
@@ -324,6 +405,25 @@ func _on_game_won_ui() -> void:
     pass
 
 var mowers_available: Array = [true, true, true, true, true]  # 每行一次性小推车
+var shovel_mode: bool = false                                  # 铲子模式（HUD 按钮切换）
+
+## 铲子按钮切换
+func _on_shovel_pressed() -> void:
+    shovel_mode = not shovel_mode
+    print("Shovel mode: ", shovel_mode)
+
+## 铲除指定格的植物并回收 50% 阳光成本（与浏览器版 removePlant 对齐）
+func _remove_plant_with_refund(key: String) -> void:
+    var plant: Node = occupied_cells.get(key)
+    if plant == null or not plant.is_instance_valid():
+        occupied_cells.erase(key)
+        return
+    var cost: int = int(PlantTypes.get_type(plant.get("type_id", "")).get("cost", 0))
+    sun += int(cost * 0.5)
+    emit_signal("sun_changed", sun)
+    plant.queue_free()
+    occupied_cells.erase(key)
+    print("Plant removed, refund ", int(cost * 0.5), " sun")
 
 func zombie_reached(row: int = -1) -> void:
     # 僵尸到达最左：先查本行小推车，可用则清行，否则失败
@@ -344,42 +444,141 @@ func _clear_row_zombies(row: int) -> void:
             z.queue_free()
     zombies_alive = 0
 
-func _show_game_over() -> void:
-    # Simple: show menu again
-    var menu_scene = preload("res://Menu.tscn")
-    var menu_instance = menu_scene.instantiate()
-    # We need to add it to a CanvasLayer on top
-    var menu_ui = get_node("MenuUI")
-    if not menu_ui:
-        menu_ui = CanvasLayer.new()
-        menu_ui.layer = 20
-        add_child(menu_ui)
-        menu_ui.name = "MenuUI"
-    # Clear previous menu if any
-    for child in menu_ui.get_children():
-        child.queue_free()
-    var menu_ctrl = menu_instance
-    menu_ui.add_child(menu_ctrl)
-    # Connect start signal again
-    menu_ctrl.connect("start_pressed", Callable(self, "_on_start_pressed"))
-    # Reset game state
-    sun = sun_start
-    emit_signal("sun_changed", sun)
-    selected_plant_type = ""
-    occupied_cells.clear()
-    # Remove all plants and zombies and projectiles
+## ===== 检查点存档（基础版：每关中段自动快照，失败可恢复） =====
+const CHECKPOINT_PATH := "user://checkpoint.cfg"
+
+## 保存本关中段检查点快照（waveIndex/sun/plants/zombies）
+func _save_checkpoint() -> void:
+    var plants_arr: Array = []
+    for p in get_tree().get_nodes_in_group("plants"):
+        plants_arr.append({
+            "type": p.get("type_id", ""),
+            "row": p.get("row", 0),
+            "col": p.get("col", 0),
+        })
+    var zombies_arr: Array = []
+    for z in get_tree().get_nodes_in_group("zombies"):
+        if not z.get("_dead", false):
+            zombies_arr.append({
+                "type": z.get("type_id", "normal"),
+                "row": z.get("row_index", 0),
+                "x": z.position.x,
+                "hp": z.get("hp", 0),
+            })
+    var data := {
+        "level_id": current_level_id,
+        "wave_index": current_wave_index,
+        "sun": sun,
+        "plants": plants_arr,
+        "zombies": zombies_arr,
+    }
+    var file := FileAccess.open(CHECKPOINT_PATH, FileAccess.WRITE)
+    if file:
+        file.store_string(JSON.stringify(data))
+        file.close()
+
+## 是否存在本关可用检查点
+func _has_checkpoint() -> bool:
+    if not FileAccess.file_exists(CHECKPOINT_PATH):
+        return false
+    var data = _load_checkpoint_data()
+    return data != null and int(data.get("level_id", 0)) == current_level_id
+
+func _load_checkpoint_data() -> Variant:
+    var file := FileAccess.open(CHECKPOINT_PATH, FileAccess.READ)
+    if not file:
+        return null
+    var data = JSON.parse_string(file.get_as_text())
+    file.close()
+    return data
+
+## 从检查点恢复（清场后按快照重建）
+func _load_checkpoint() -> void:
+    var data = _load_checkpoint_data()
+    if data == null:
+        return
+    # 清场
     for p in get_tree().get_nodes_in_group("plants"):
         p.queue_free()
     for z in get_tree().get_nodes_in_group("zombies"):
         z.queue_free()
-    for proj in get_tree().get_nodes_in_group("projectiles"):
-        proj.queue_free()
-    for sun_node in get_tree().get_nodes_in_group("suns"):
-        sun_node.queue_free()
-    # 重置关卡系统并重新开始
+    occupied_cells.clear()
+    zombies_alive = 0
+    # 恢复状态
+    current_level_id = int(data.get("level_id", 1))
+    current_wave_index = int(data.get("wave_index", 0))
+    sun = int(data.get("sun", sun_start))
+    emit_signal("sun_changed", sun)
+    current_level = Levels.get_level(current_level_id)
+    current_wave = current_level["waves"][current_wave_index]
+    # 重建植物
+    for pdata in data.get("plants", []):
+        var key: String = str(pdata["col"]) + "," + str(pdata["row"])
+        var plant_scene = preload("res://Plant.tscn")
+        var plant_instance = plant_scene.instantiate()
+        plant_instance.type_id = pdata["type"]
+        plant_instance.row = int(pdata["row"])
+        plant_instance.col = int(pdata["col"])
+        plant_instance.position = grid.grid_to_world(Vector2(int(pdata["col"]), int(pdata["row"])))
+        add_child(plant_instance)
+        occupied_cells[key] = plant_instance
+    # 重建僵尸
+    for zdata in data.get("zombies", []):
+        var zombie_scene = preload("res://Zombie.tscn")
+        var zombie_instance = zombie_scene.instantiate()
+        zombie_instance.type_id = zdata["type"]
+        zombie_instance.row_index = int(zdata["row"])
+        var y = grid.grid_to_world(Vector2(0, int(zdata["row"]))).y - grid.cell_height / 2
+        zombie_instance.position = Vector2(float(zdata["x"]), y)
+        if "hp" in zdata:
+            zombie_instance.hp = int(zdata["hp"])
+        add_child(zombie_instance)
+        zombies_alive += 1
+        zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited", [zombie_instance]))
+    # 重新开始波次
+    game_started = true
+    call_deferred("_start_wave_prepare")
+    print("Checkpoint restored at level ", current_level_id, " wave ", current_wave_index + 1)
+
+func _show_game_over() -> void:
+    # 失败面板：有本关检查点 → 提供"从检查点恢复"；否则重开本关
+    var panel := Panel.new()
+    panel.name = "GameOverPanel"
+    panel.position = Vector2(330, 180)
+    panel.size = Vector2(300, 200)
+    add_child(panel)
+    var title := Label.new()
+    title.text = "防线被突破！"
+    title.position = Vector2(20, 10)
+    title.size = Vector2(260, 40)
+    panel.add_child(title)
+    if _has_checkpoint():
+        var btn_resume := Button.new()
+        btn_resume.text = "从检查点恢复"
+        btn_resume.position = Vector2(40, 60)
+        btn_resume.pressed.connect(_on_game_over_resume)
+        panel.add_child(btn_resume)
+    var btn_restart := Button.new()
+    btn_restart.text = "重开本关"
+    btn_restart.position = Vector2(40, 110)
+    btn_restart.pressed.connect(_on_game_over_restart)
+    panel.add_child(btn_restart)
+
+func _on_game_over_resume() -> void:
+    var panel = get_node_or_null("GameOverPanel")
+    if panel:
+        panel.queue_free()
+    _load_checkpoint()
+
+func _on_game_over_restart() -> void:
+    var panel = get_node_or_null("GameOverPanel")
+    if panel:
+        panel.queue_free()
+    # 重置关卡系统并重新开始本关
     _reset_level_state()
-    _start_wave_prepare()
-    print("Game over, menu shown")
+    game_started = true
+    call_deferred("_start_wave_prepare")
+    print("Level restarted")
 
 func shoot_projectile(from_row: int, from_x: float, damage: int) -> void:
     var proj_scene = preload("res://scenes/Projectile.tscn")
