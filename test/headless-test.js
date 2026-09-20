@@ -481,7 +481,10 @@ async function runTests() {
       // 3. 夜间关卡在 SUN_FALL_INTERVAL 时间内不应生成天空阳光
       game.suns = [];
       game.sunFallTimer = 0;
-      game.update(CONFIG.SUN_FALL_INTERVAL + 100);
+      // 分小步推进，避免单帧大 dt 触发完整模拟副作用
+      for (let i = 0; i < Math.ceil((CONFIG.SUN_FALL_INTERVAL + 100) / 16); i++) {
+        game.update(16);
+      }
       const skySuns = game.suns.filter(s => s.source === 'sky').length;
       if (skySuns > 0) {
         return { ok: false, reason: `夜间关卡不应生成天空阳光, 实际 ${skySuns}` };

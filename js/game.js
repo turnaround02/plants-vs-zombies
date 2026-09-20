@@ -131,7 +131,7 @@ class Game {
     this.gameTime += dt;
 
     // 天空掉阳光（夜间关卡不掉自然阳光，仅靠植物生产）
-    const isNight = this.levelManager && this.levelManager.level && this.levelManager.level.night;
+    const isNight = this.isNightLevel();
     if (!isNight) {
       this.sunFallTimer += dt;
       if (this.sunFallTimer >= CONFIG.SUN_FALL_INTERVAL) {
@@ -353,7 +353,7 @@ class Game {
   }
 
   renderBackground(ctx) {
-    const isNight = this.levelManager && this.levelManager.level && this.levelManager.level.night;
+    const isNight = this.isNightLevel();
 
     if (isNight) {
       // 夜间草地背景（深色）
@@ -801,6 +801,11 @@ class Game {
 
   getAliveZombieCount() {
     return this.zombies.filter(z => z.alive && !z.dead).length;
+  }
+
+  // 是否为夜间关卡（夜间不掉自然阳光，背景为深色）
+  isNightLevel() {
+    return this.levelManager && this.levelManager.level && this.levelManager.level.night;
   }
 
   // ==========================================================
