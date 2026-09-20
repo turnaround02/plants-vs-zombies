@@ -187,7 +187,6 @@ func _unhandled_input(event: InputEvent) -> void:
                     shovel_mode = false
                     return
         if event.button_index == MOUSE_BUTTON_RIGHT:
-        if event.button_index == MOUSE_BUTTON_RIGHT:
             selected_plant_type = ""
             print("Selection cleared")
             return

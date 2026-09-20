@@ -471,6 +471,10 @@ var levels: Dictionary = {
                 ],
         },
 
+## 获取指定关卡数据（id 不存在时返回空 dict，调用方应检查）
+func get_level(id: int) -> Dictionary:
+	return levels.get(id, {})
+
 ## 所有关卡 ID（升序）
 func all_ids() -> Array:
 	return levels.keys()
