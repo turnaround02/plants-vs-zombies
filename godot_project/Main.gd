@@ -89,12 +89,13 @@ func _ready() -> void:
         push_error("Could not find PlantBar node")
     else:
         plant_bar.connect("plant_selected", Callable(self, "_on_plant_selected"))
-    # Get Menu and connect start signal
+    # Get Menu and connect start/level-select signals
     menu = get_node("MenuUI/Menu")
     if not menu:
         push_error("Could not find Menu node")
     else:
         menu.connect("start_pressed", Callable(self, "_on_start_pressed"))
+        menu.connect("level_selected", Callable(self, "_on_menu_level_selected"))
     # Connect sun_changed signal to update label
     connect("sun_changed", Callable(self, "_on_sun_changed"))
     # 连接铲子按钮（HUD 新增）
@@ -117,6 +118,15 @@ func _ready() -> void:
 func _on_start_pressed() -> void:
     game_started = true
     print("Game started!")
+
+## 菜单中选中已解锁关卡 → 直接进入该关
+func _on_menu_level_selected(level_id: int) -> void:
+    var menu_ctrl = get_node_or_null("MenuUI/Menu")
+    if menu_ctrl:
+        menu_ctrl.queue_free()
+    _start_level(level_id)
+    game_started = true
+    print("Started selected level ", level_id)
 
 func _on_plant_selected(type_name: String) -> void:
     selected_plant_type = type_name
@@ -276,9 +286,37 @@ func _show_result_screen() -> void:
     btn_next.pressed.connect(_on_result_button)
 
 func _on_result_button() -> void:
+    _clear_result_screen()
     var is_last: bool = current_level_id >= Levels.all_ids().size()
     if not is_last:
         _start_level(current_level_id + 1)
+    else:
+        _back_to_menu()
+
+func _clear_result_screen() -> void:
+    for n in ["ResultLabel", "NextLevelButton"]:
+        var node = get_node_or_null(n)
+        if node:
+            node.queue_free()
+
+## 返回主菜单（末关通关后 / 可选重开入口）
+func _back_to_menu() -> void:
+    var menu_scene = preload("res://Menu.tscn")
+    var menu_instance = menu_scene.instantiate()
+    var menu_ui = get_node_or_null("MenuUI")
+    if not menu_ui:
+        menu_ui = CanvasLayer.new()
+        menu_ui.layer = 20
+        add_child(menu_ui)
+        menu_ui.name = "MenuUI"
+    for child in menu_ui.get_children():
+        child.queue_free()
+    menu_ui.add_child(menu_instance)
+    menu_instance.connect("start_pressed", Callable(self, "_on_start_pressed"))
+    menu_instance.connect("level_selected", Callable(self, "_on_menu_level_selected"))
+    # 重置到第 1 关待命状态
+    _reset_level_state()
+    game_started = false
 
 ## 从指定关卡 ID 开始（供胜利结算/关卡选择使用）
 func _start_level(level_id: int) -> void:
