@@ -421,11 +421,55 @@ var levels: Dictionary = {
 			],
 		],
 	},
-}
-
-## 获取指定关卡数据（不存在则回退到第 1 关）
-func get_level(level_id: int) -> Dictionary:
-	return levels.get(level_id, levels[1])
+        # 第 9 关（夜间：天空不掉阳光，开局 150 阳光）
+        9: {
+                "name": "第九关：夜幕降临",
+                "start_sun": 150,
+                "night": true,
+                "waves": [
+                        # 第 1 波: 铁桶 + 撑杆 + 读报混合
+                        [
+                                { "type": "bucket", "delay": 0.0 },
+                                { "type": "pole_vault", "delay": 1.5 },
+                                { "type": "newspaper", "delay": 3.0 },
+                                { "type": "bucket", "delay": 4.5 },
+                                { "type": "runner", "delay": 6.0 },
+                                { "type": "pole_vault", "delay": 7.5 },
+                                { "type": "newspaper", "delay": 9.0 },
+                        ],
+                        # 第 2 波: 铁桶 + 撑杆 + 读报 + 路障
+                        [
+                                { "type": "bucket", "delay": 0.0 },
+                                { "type": "pole_vault", "delay": 1.0 },
+                                { "type": "newspaper", "delay": 2.0 },
+                                { "type": "bucket", "delay": 3.0 },
+                                { "type": "runner", "delay": 4.0 },
+                                { "type": "pole_vault", "delay": 5.0 },
+                                { "type": "newspaper", "delay": 6.0 },
+                                { "type": "cone", "delay": 7.0 },
+                                { "type": "bucket", "delay": 8.0 },
+                                { "type": "pole_vault", "delay": 9.0 },
+                                { "type": "newspaper", "delay": 10.0 },
+                        ],
+                        # 第 3 波: 最终波，混合大军
+                        [
+                                { "type": "bucket", "delay": 0.0 },
+                                { "type": "pole_vault", "delay": 0.7 },
+                                { "type": "newspaper", "delay": 1.4 },
+                                { "type": "bucket", "delay": 2.1 },
+                                { "type": "runner", "delay": 2.8 },
+                                { "type": "pole_vault", "delay": 3.5 },
+                                { "type": "newspaper", "delay": 4.2 },
+                                { "type": "bucket", "delay": 4.9 },
+                                { "type": "runner", "delay": 5.6 },
+                                { "type": "pole_vault", "delay": 6.3 },
+                                { "type": "cone", "delay": 7.0 },
+                                { "type": "newspaper", "delay": 7.7 },
+                                { "type": "bucket", "delay": 8.4 },
+                                { "type": "pole_vault", "delay": 9.1 },
+                        ],
+                ],
+        },
 
 ## 所有关卡 ID（升序）
 func all_ids() -> Array:
