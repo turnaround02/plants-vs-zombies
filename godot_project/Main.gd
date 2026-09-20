@@ -208,6 +208,8 @@ func _reset_level_state() -> void:
     # 应用关卡初始阳光
     sun = current_level.get("start_sun", sun_start)
     emit_signal("sun_changed", sun)
+    # 重置每行小推车
+    mowers_available = [true, true, true, true, true]
     _update_wave_label()
 
 ## 波次预告开始（显示关卡/波次信息后进入生成阶段）
@@ -321,11 +323,26 @@ func _on_game_won_ui() -> void:
     # 胜利状态下的 UI 钩子（可扩展为弹出胜利提示）
     pass
 
-func zombie_reached() -> void:
-    # Called when a zombie reaches x <= 0 (in Zombie.gd we call main.zombie_reached())
+var mowers_available: Array = [true, true, true, true, true]  # 每行一次性小推车
+
+func zombie_reached(row: int = -1) -> void:
+    # 僵尸到达最左：先查本行小推车，可用则清行，否则失败
+    if row >= 0 and row < 5 and mowers_available[row]:
+        mowers_available[row] = false
+        _clear_row_zombies(row)
+        print("Mower triggered in row ", row)
+        return
     print("Zombie reached house! Game Over")
     game_started = false
     _show_game_over()
+
+## 小推车触发：清除本行全部僵尸（计入得分）
+func _clear_row_zombies(row: int) -> void:
+    for z in get_tree().get_nodes_in_group("zombies"):
+        if z.get("row_index") == row:
+            record_kill(z.get("type_id", "normal"))
+            z.queue_free()
+    zombies_alive = 0
 
 func _show_game_over() -> void:
     # Simple: show menu again
