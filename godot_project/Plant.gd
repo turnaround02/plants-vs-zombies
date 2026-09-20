@@ -27,7 +27,8 @@ func _ready() -> void:
     if type_id == "":
         push_error("Plant type_id not set")
         return
-    type = PlantTypes.get_type(type_id)
+    var _pt = get_node_or_null("/root/PlantTypes")
+    type = _pt.get_type(type_id) if _pt else {}
     if type.is_empty():
         push_error("Unknown plant type: " + type_id)
         return

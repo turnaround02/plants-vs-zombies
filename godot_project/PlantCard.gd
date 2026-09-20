@@ -23,7 +23,8 @@ func set_enabled(enabled: bool) -> void:
 func _update_display() -> void:
     if plant_type_name == "":
         return
-    var data = PlantTypes.get_type(plant_type_name)
+    var pt = get_node_or_null("/root/PlantTypes")
+    var data = pt.get_type(plant_type_name) if pt else {}
     if data.is_empty():
         return
     cost = data.get("cost", 0)

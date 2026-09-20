@@ -26,7 +26,9 @@ func _build_level_select() -> void:
     title.text = "选择关卡"
     title.position = Vector2(20, 10)
     panel.add_child(title)
-    for i in range(1, Levels.all_ids().size() + 1):
+    var _lv = get_node_or_null("/root/Levels")
+    var _total: int = _lv.all_ids().size() if _lv else 0
+    for i in range(1, _total + 1):
         var btn := Button.new()
         btn.text = "第 " + str(i) + " 关"
         var row_idx: int = (i - 1) / 3

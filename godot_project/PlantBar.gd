@@ -12,7 +12,9 @@ func _populate() -> void:
     for c in hbox.get_children():
         c.queue_free()
     # Create plant cards
-    for type_name in PlantTypes.get_all().keys():
+    var pt = get_node_or_null("/root/PlantTypes")
+    if pt == null: return
+    for type_name in pt.get_all().keys():
         var card = preload("res://PlantCard.tscn").instantiate()
         card.set_plant_type(type_name)
         card.connect("card_selected", Callable(self, "_on_card_selected"))
@@ -24,6 +26,6 @@ func _on_card_selected(type_name: String) -> void:
 func update_affordability(current_sun: int) -> void:
     var hbox = $HBoxContainer
     for child in hbox.get_children():
-        if child is PlantCard:
+        if "PlantCard" in child.name or child.has_method("set_enabled"):
             var cost = child.cost
             child.set_enabled(current_sun >= cost)

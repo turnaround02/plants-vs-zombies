@@ -4,11 +4,10 @@
 
 [node name="Menu" type="Control"]
 custom_minimum_size = Vector2(960, 600)
+script = ExtResource( 1 )
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
 anchors_preset = 15
 
 [node name="Button" type="Button" parent="CenterContainer"]
 text = "Start Game"
-
-script = ExtResource( 1 )
