@@ -167,6 +167,21 @@ func add_sun(amount: int) -> void:
 	sun += amount
 	emit_signal("sun_changed", sun)
 
+## 阳光收集兜底：点击位置附近（半径 40px）找最近的阳光直接拾取
+func _try_collect_sun(click_pos: Vector2) -> void:
+	var suns = get_tree().get_nodes_in_group("suns")
+	var best: Node = null
+	var best_d: float = 40.0 * 40.0
+	for s in suns:
+		if s == null or not is_instance_valid(s):
+			continue
+		var d2: float = s.position.distance_squared_to(click_pos)
+		if d2 < best_d:
+			best_d = d2
+			best = s
+	if best != null and best.has_method("collect"):
+		best.collect()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_started:
 		return
@@ -174,6 +189,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE or event.keycode == KEY_P:
 			_toggle_pause()
+			return
+		if event.keycode == KEY_SPACE and selected_plant_type != "":
+			selected_plant_type = ""
+			if plant_bar:
+				plant_bar.deselect_all()
+			print("Selection cancelled (Space)")
 			return
 		if event.keycode == KEY_1 and shovel_mode:
 			shovel_mode = false
@@ -199,14 +220,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index != MOUSE_BUTTON_LEFT:
 			return
 		# handle left button
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var _im2 = get_node_or_null("/root/InputManager")
-		var world_pos: Vector2 = _im2.get_mouse_position() if _im2 else Vector2.ZERO
-		print("Left click at world:", world_pos)
-		if selected_plant_type != "" and grid:
-			var grid_coord: Vector2 = grid.world_to_grid(world_pos)
-			if grid_coord.x >= 0 and grid_coord.y >= 0:
-				_try_place_plant(grid_coord.x, grid_coord.y)
+		# 阳光收集兜底：查找半径 40px 内最近的阳光，直接拾取
+		var _im3 = get_node_or_null("/root/InputManager")
+		var _wp: Vector2 = _im3.get_mouse_position() if _im3 else Vector2.ZERO
+		_try_collect_sun(_wp)
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			var world_pos: Vector2 = _wp
+			if selected_plant_type != "" and grid:
+				var grid_coord: Vector2 = grid.world_to_grid(world_pos)
+				if grid_coord.x >= 0 and grid_coord.y >= 0:
+					_try_place_plant(grid_coord.x, grid_coord.y)
 
 func _try_place_plant(x: int, y: int) -> void:
 	var key: String = str(x) + "," + str(y)

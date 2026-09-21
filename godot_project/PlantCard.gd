@@ -32,3 +32,18 @@ func _update_display() -> void:
 
 func _on_pressed() -> void:
     emit_signal("card_selected", plant_type_name)
+    highlight()
+
+func highlight() -> void:
+    add_theme_stylebox_override("normal", _build_style(Color(0.35, 0.55, 0.25, 1)))
+    add_theme_stylebox_override("hover", _build_style(Color(0.4, 0.62, 0.28, 1)))
+
+func clear_highlight() -> void:
+    add_theme_stylebox_override("normal", _build_style(Color(0.16, 0.2, 0.14, 1)))
+    add_theme_stylebox_override("hover", _build_style(Color(0.22, 0.28, 0.19, 1)))
+
+func _build_style(bg: Color) -> StyleBoxFlat:
+    var sb := StyleBoxFlat.new()
+    sb.bg_color = bg
+    sb.set_corner_radius_all(6)
+    return sb

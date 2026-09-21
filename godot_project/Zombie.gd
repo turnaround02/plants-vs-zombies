@@ -45,11 +45,114 @@ func _apply_type() -> void:
     attack_damage = t.get("damage", attack_damage)
     score = t.get("score", 0)
 
+## 程序化绘制僵尸（头/眼/嘴/身体/手臂/腿 + 头饰区分类型），避免绿色方块
 func _make_placeholder() -> void:
-    var img := Image.create(30, 60, false, Image.FORMAT_RGBA8)
-    img.fill(Color(0.5, 0.7, 0.2, 1.0))  # green blob
-    _sprite.texture = ImageTexture.create_from_image(img)
-    _sprite.offset = Vector2(15, 30)
+    var W := 32
+    var H := 64
+    var img := Image.create(W, H, false, Image.FORMAT_RGBA8)
+    var skin := Color(0.55, 0.68, 0.35)
+    var skin_dark := Color(0.45, 0.56, 0.28)
+    var shirt := Color(0.5, 0.42, 0.75)
+    var pants := Color(0.3, 0.32, 0.45)
+    var black := Color(0.1, 0.1, 0.1)
+
+    # 头（圆角块）
+    _fill_rounded(img, 6, 2, 20, 20, 4, skin)
+    # 眼睛
+    _rect(img, 10, 9, 4, 4, Color.WHITE)
+    _rect(img, 18, 9, 4, 4, Color.WHITE)
+    _rect(img, 11, 10, 2, 2, black)
+    _rect(img, 19, 10, 2, 2, black)
+    # 嘴
+    _rect(img, 11, 16, 9, 2, skin_dark)
+    # 身体
+    _rect(img, 7, 22, 18, 18, shirt)
+    # 手臂（前伸）
+    _rect(img, 1, 25, 7, 5, skin)
+    _rect(img, 24, 29, 8, 5, skin)
+    # 腿
+    _rect(img, 9, 40, 6, 20, pants)
+    _rect(img, 17, 40, 6, 20, pants)
+
+    # 头饰按类型区分
+    match type_id:
+        "cone":
+            # 路锥（三角形）
+            var tri := _tri_points(16, 2, 6, 24, 26, 22)
+            for p in tri:
+                var pv: Vector2 = p
+                _rect(img, int(pv.x), int(pv.y), 1, 1, Color(0.95, 0.55, 0.1))
+        "bucket":
+            # 铁桶
+            _fill_rounded(img, 5, 0, 22, 14, 3, Color(0.6, 0.62, 0.68))
+            _rect(img, 5, 5, 22, 3, Color(0.45, 0.47, 0.52))
+        "runner":
+            # 红色头巾
+            _rect(img, 5, 6, 22, 6, Color(0.8, 0.2, 0.2))
+        "pole_vault":
+            # 撑杆
+            _rect(img, 29, 0, 3, 62, Color(0.7, 0.5, 0.25))
+            _rect(img, 26, 2, 8, 4, Color(0.7, 0.5, 0.25))
+        "newspaper":
+            # 报纸（胸前白纸）
+            _rect(img, 9, 24, 14, 12, Color(0.92, 0.9, 0.85))
+            _rect(img, 10, 26, 12, 1, Color(0.5, 0.5, 0.5))
+            _rect(img, 10, 29, 12, 1, Color(0.5, 0.5, 0.5))
+            _rect(img, 10, 32, 12, 1, Color(0.5, 0.5, 0.5))
+
+    var tex := ImageTexture.create_from_image(img)
+    _sprite.texture = tex
+    _sprite.offset = Vector2(W / 2, H)
+
+## --- 像素绘制辅助 ---
+func _rect(img: Image, x: int, y: int, w: int, h: int, col: Color) -> void:
+    for py in range(y, y + h):
+        if py < 0 or py >= img.get_height():
+            continue
+        for px in range(x, x + w):
+            if px < 0 or px >= img.get_width():
+                continue
+            img.set_pixel(px, py, col)
+
+func _fill_rounded(img: Image, x: int, y: int, w: int, h: int, r: int, col: Color) -> void:
+    for py in range(y, y + h):
+        for px in range(x, x + w):
+            if px < 0 or py < 0 or px >= img.get_width() or py >= img.get_height():
+                continue
+            # 圆角判断
+            var cdx := 0.0
+            var cdy := 0.0
+            var corner := 0
+            if px < x + r and py < y + r:
+                corner = 1
+                cdx = px - (x + r - 1)
+                cdy = py - (y + r - 1)
+            elif px >= x + w - r and py < y + r:
+                corner = 2
+                cdx = px - (x + w - r)
+                cdy = py - (y + r - 1)
+            elif px < x + r and py >= y + h - r:
+                corner = 3
+                cdx = px - (x + r - 1)
+                cdy = py - (y + h - r)
+            elif px >= x + w - r and py >= y + h - r:
+                corner = 4
+                cdx = px - (x + w - r)
+                cdy = py - (y + h - r)
+            if corner != 0:
+                var d := Vector2(cdx, cdy).length()
+                if d > float(r):
+                    continue
+            img.set_pixel(px, py, col)
+
+func _tri_points(ax: int, ay: int, bx: int, by: int, cx: int, cy: int) -> Array:
+    var pts: Array = []
+    for py in range(ay, cy + 1):
+        var lft := int(lerpf(float(ax), float(bx), float(py - ay) / maxf(1.0, float(by - ay))))
+        var rgt := int(lerpf(float(ax), float(cx), float(py - ay) / maxf(1.0, float(cy - ay))))
+        for px in range(minf(float(lft), float(rgt)), maxf(float(lft), float(rgt)) + 1):
+            pts.append(Vector2(px, py))
+    return pts
 
 func _process(delta: float) -> void:
     # Death animation - fade out and rotate

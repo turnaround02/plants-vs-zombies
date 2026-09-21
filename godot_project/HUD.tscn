@@ -36,15 +36,17 @@ custom_font_size = 24
 [node name="ShovelButton" type="Button" parent="."]
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -120
-offset_top = 10
+offset_left = -120.0
+offset_top = 10.0
+offset_right = -10.0
 text = "铲子 🪏"
 
 [node name="PauseButton" type="Button" parent="."]
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -240
-offset_top = 10
+offset_left = -240.0
+offset_top = 10.0
+offset_right = -130.0
 text = "暂停 ⏸"
 
 [node name="PauseLabel" type="Label" parent="."]

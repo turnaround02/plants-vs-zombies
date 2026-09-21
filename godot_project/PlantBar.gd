@@ -23,6 +23,13 @@ func _populate() -> void:
 func _on_card_selected(type_name: String) -> void:
     emit_signal("plant_selected", type_name)
 
+## 清除卡片上的选中高亮（取消选择时调用）
+func deselect_all() -> void:
+    var hbox = $HBoxContainer
+    for child in hbox.get_children():
+        if child.has_method("clear_highlight"):
+            child.clear_highlight()
+
 func update_affordability(current_sun: int) -> void:
     var hbox = $HBoxContainer
     for child in hbox.get_children():
