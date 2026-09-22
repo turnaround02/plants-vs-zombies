@@ -102,12 +102,12 @@ func _ready() -> void:
 		menu.connect("level_selected", Callable(self, "_on_menu_level_selected"))
 	# Connect sun_changed signal to update label
 	connect("sun_changed", Callable(self, "_on_sun_changed"))
-	# 连接铲子按钮（HUD 新增）
-	var shovel_btn = hud_node.get_node_or_null("ShovelButton") if hud_node else null
+	# 连接铲子按钮（HUD 新增，位于右上角 RightButtons 容器内）
+	var shovel_btn = hud_node.get_node_or_null("RightButtons/ShovelButton") if hud_node else null
 	if shovel_btn:
 		shovel_btn.connect("pressed", Callable(self, "_on_shovel_pressed"))
-	# 连接暂停按钮（HUD 新增）
-	var pause_btn = hud_node.get_node_or_null("PauseButton") if hud_node else null
+	# 连接暂停按钮（HUD 新增，位于右上角 RightButtons 容器内）
+	var pause_btn = hud_node.get_node_or_null("RightButtons/PauseButton") if hud_node else null
 	if pause_btn:
 		pause_btn.connect("pressed", Callable(self, "_toggle_pause"))
 	# Emit initial sun change (will trigger the callback)
@@ -120,6 +120,10 @@ func _ready() -> void:
 	call_deferred("_start_wave_prepare")
 
 func _on_start_pressed() -> void:
+	var menu_ctrl = get_node_or_null("MenuUI/Menu")
+	if menu_ctrl:
+		menu_ctrl.queue_free()
+	_start_level(1)
 	game_started = true
 	print("Game started!")
 
@@ -167,8 +171,9 @@ func add_sun(amount: int) -> void:
 	sun += amount
 	emit_signal("sun_changed", sun)
 
-## 阳光收集兜底：点击位置附近（半径 40px）找最近的阳光直接拾取
-func _try_collect_sun(click_pos: Vector2) -> void:
+## 阳光收集：点击位置附近（半径 40px）找最近的阳光直接拾取
+## 返回 true 表示拾取到了阳光（调用方应跳过后续放置逻辑）
+func _try_collect_sun(click_pos: Vector2) -> bool:
 	var suns = get_tree().get_nodes_in_group("suns")
 	var best: Node = null
 	var best_d: float = 40.0 * 40.0
@@ -181,6 +186,8 @@ func _try_collect_sun(click_pos: Vector2) -> void:
 			best = s
 	if best != null and best.has_method("collect"):
 		best.collect()
+		return true
+	return false
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not game_started:
@@ -203,8 +210,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		# 铲子模式优先：点击植物即铲除（回收 50% 阳光）
 		if shovel_mode and event.button_index == MOUSE_BUTTON_LEFT:
-			var _im = get_node_or_null("/root/InputManager")
-			var wp: Vector2 = _im.get_mouse_position() if _im else Vector2.ZERO
+			var wp: Vector2 = get_global_mouse_position()
 			var gcoord: Vector2 = grid.world_to_grid(wp) if grid else Vector2(-1, -1)
 			if gcoord.x >= 0 and gcoord.y >= 0:
 				var key: String = str(gcoord.x) + "," + str(gcoord.y)
@@ -220,24 +226,31 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index != MOUSE_BUTTON_LEFT:
 			return
 		# handle left button
-		# 阳光收集兜底：查找半径 40px 内最近的阳光，直接拾取
-		var _im3 = get_node_or_null("/root/InputManager")
-		var _wp: Vector2 = _im3.get_mouse_position() if _im3 else Vector2.ZERO
-		_try_collect_sun(_wp)
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			var world_pos: Vector2 = _wp
-			if selected_plant_type != "" and grid:
-				var grid_coord: Vector2 = grid.world_to_grid(world_pos)
-				if grid_coord.x >= 0 and grid_coord.y >= 0:
-					_try_place_plant(grid_coord.x, grid_coord.y)
+		# 统一世界坐标来源：阳光收集 + 植物放置
+		var world_pos: Vector2 = get_global_mouse_position()
+		print("LEFT CLICK at ", world_pos, " | selected=", selected_plant_type, " | suns=", get_tree().get_nodes_in_group("suns").size())
+		# 先尝试收集阳光（点中阳光就拾取，避免被误当成放置）
+		var collected: bool = _try_collect_sun(world_pos)
+		if collected:
+			return
+		if selected_plant_type != "" and grid:
+			var grid_coord: Vector2 = grid.world_to_grid(world_pos)
+			if grid_coord.x >= 0 and grid_coord.y >= 0:
+				_try_place_plant(grid_coord.x, grid_coord.y)
+		else:
+			print("PLACE skipped: selected=[", selected_plant_type, "] grid_null=" + str(grid == null))
 
 func _try_place_plant(x: int, y: int) -> void:
+	print("_try_place_plant(", x, ",", y, ") sun=" + str(sun) + " selected=" + selected_plant_type)
 	var key: String = str(x) + "," + str(y)
 	if occupied_cells.has(key):
 		print("Cell already occupied")
 		return
 	var _pt = get_node_or_null("/root/PlantTypes")
-	var plant_data = _pt.get_type(selected_plant_type) if _pt else {}
+	if _pt == null:
+		print("PlantTypes autoload is NULL!")
+		return
+	var plant_data = _pt.get_type(selected_plant_type)
 	if plant_data.is_empty():
 		print("Invalid plant type:", selected_plant_type)
 		return
@@ -245,6 +258,7 @@ func _try_place_plant(x: int, y: int) -> void:
 	if sun < cost:
 		print("Not enough sun! need ", cost, " have ", sun)
 		return
+	print("PLACING plant", selected_plant_type, "at cell", x, y)
 	# Deduct sun
 	sun -= cost
 	emit_signal("sun_changed", sun)
