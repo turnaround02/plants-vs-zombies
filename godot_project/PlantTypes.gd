@@ -16,7 +16,7 @@ var types: Dictionary = {
         "icon": "🌱",
         "cost": 100,
         "hp": 100,
-        "damage": 2,
+        "damage": 20,
         "fire_rate": 1.2,
         "range": 400,
         "behavior": "shooter"

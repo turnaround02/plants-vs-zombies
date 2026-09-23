@@ -162,6 +162,7 @@ func _process(delta: float) -> void:
 func spawn_sun_from_sky() -> void:
 	var x: float = randf() * VIEWPORT_WIDTH
 	var sun_instance: Node2D = preload("res://scenes/Sun.tscn").instantiate()
+	sun_instance.process_mode = Node.PROCESS_MODE_PAUSABLE
 	sun_instance.position = Vector2(x, -20)
 	sun_instance.sun_amount = sun_fall_amount
 	add_child(sun_instance)
@@ -170,6 +171,7 @@ func spawn_sun_from_sky() -> void:
 ## 向日葵等产光植物在自身位置生成可见阳光（短下落 + 可点击收集）
 func spawn_sun_at(pos: Vector2, amount: int) -> void:
 	var sun_instance: Node2D = preload("res://scenes/Sun.tscn").instantiate()
+	sun_instance.process_mode = Node.PROCESS_MODE_PAUSABLE
 	sun_instance.position = pos
 	sun_instance.sun_amount = amount
 	# 植物产出的阳光下落更短、更快，避免飘到别处
@@ -269,6 +271,7 @@ func _try_place_plant(x: int, y: int) -> void:
 	# Place actual plant
 	var plant_scene = preload("res://Plant.tscn")
 	var plant_instance = plant_scene.instantiate()
+	plant_instance.process_mode = Node.PROCESS_MODE_PAUSABLE
 	plant_instance.type_id = selected_plant_type
 	plant_instance.row = int(y)
 	plant_instance.col = int(x)
@@ -453,6 +456,7 @@ func _update_wave(delta: float) -> void:
 func spawn_zombie(zombie_type: String = "normal") -> void:
 	var zombie_scene = preload("res://Zombie.tscn")
 	var zombie_instance = zombie_scene.instantiate()
+	zombie_instance.process_mode = Node.PROCESS_MODE_PAUSABLE
 	var row = randi() % 5  # 0-4
 	zombie_instance.row_index = row
 	if zombie_instance.has_method("set_type") or "type_id" in zombie_instance:
@@ -685,6 +689,7 @@ func shoot_projectile(from_row: int, from_x: float, damage: int) -> void:
 	var proj_instance = proj_scene.instantiate()
 	proj_instance.row = from_row
 	proj_instance.damage = damage
+	proj_instance.process_mode = Node.PROCESS_MODE_PAUSABLE
 	var y = grid.grid_to_world(Vector2(0, from_row)).y - grid.cell_height / 2
 	proj_instance.position = Vector2(from_x, y)
 	add_child(proj_instance)

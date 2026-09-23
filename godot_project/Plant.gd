@@ -172,15 +172,68 @@ func _do_charm() -> void:
     queue_free()
 
 func _make_placeholder() -> void:
-    _sprite.texture = _build_emoji_texture(type.get("icon", "🌱"), 48)
+    _sprite.texture = _build_plant_texture(type)
 
-## 用默认主题字体（含系统 emoji 回退）把 emoji 渲染成贴图，保证与卡片图标一致
-static func _build_emoji_texture(emoji: String, size: int) -> ImageTexture:
-    var font := ThemeDB.fallback_font
-    var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
-    var pos := Vector2(size * 0.5, size * 0.5 + font.get_height() * 0.35)
-    font.draw_string(img, pos, emoji, HORIZONTAL_ALIGNMENT_CENTER, -1, size, Color.WHITE)
-    return ImageTexture.create_from_image(img)
+## 程序化绘制植物（底座 + 行为图标），保证草地上的植物可见且与卡片语义一致
+static func _build_plant_texture(type: Dictionary) -> ImageTexture:
+    var W := 40
+    var H := 40
+    var img := Image.create(W, H, false, Image.FORMAT_RGBA8)
+    img.fill(Color(0, 0, 0, 0))
+    # 底座圆角块（不同行为不同色）
+    var base := Color(0.3, 0.75, 0.35)
+    match type.get("behavior", ""):
+        "sunProducer": base = Color(1.0, 0.85, 0.1)
+        "shooter": base = Color(0.25, 0.65, 0.3)
+        "wall": base = Color(0.7, 0.5, 0.25)
+        "bomb": base = Color(0.9, 0.25, 0.25)
+        "charm": base = Color(0.8, 0.4, 0.9)
+    _plant_fill_rounded(img, 4, 14, 32, 22, 6, base)
+    # 顶部"叶子/花瓣"装饰
+    _plant_fill_rounded(img, 10, 4, 20, 14, 5, base.lightened(0.25))
+    # 眼睛点缀
+    _plant_rect(img, 12, 22, 4, 4, Color(0.1, 0.1, 0.1))
+    _plant_rect(img, 24, 22, 4, 4, Color(0.1, 0.1, 0.1))
+    var tex := ImageTexture.create_from_image(img)
+    return tex
+
+## 像素矩形填充（静态，供 _build_plant_texture 调用）
+static func _plant_rect(img: Image, x: int, y: int, w: int, h: int, col: Color) -> void:
+    for py in range(y, y + h):
+        for px in range(x, x + w):
+            if px >= 0 and py >= 0 and px < img.get_width() and py < img.get_height():
+                img.set_pixel(px, py, col)
+
+## 圆角矩形填充（静态，供 _build_plant_texture 调用）
+static func _plant_fill_rounded(img: Image, x: int, y: int, w: int, h: int, r: int, col: Color) -> void:
+    for py in range(y, y + h):
+        for px in range(x, x + w):
+            if px < 0 or py < 0 or px >= img.get_width() or py >= img.get_height():
+                continue
+            var cdx := 0
+            var cdy := 0
+            var corner := 0
+            if px < x + r and py < y + r:
+                corner = 1
+                cdx = px - (x + r - 1)
+                cdy = py - (y + r - 1)
+            elif px >= x + w - r and py < y + r:
+                corner = 2
+                cdx = px - (x + w - r)
+                cdy = py - (y + r - 1)
+            elif px < x + r and py >= y + h - r:
+                corner = 3
+                cdx = px - (x + r - 1)
+                cdy = py - (y + h - r)
+            elif px >= x + w - r and py >= y + h - r:
+                corner = 4
+                cdx = px - (x + w - r)
+                cdy = py - (y + h - r)
+            if corner != 0:
+                var d := Vector2(cdx, cdy).length()
+                if d > float(r):
+                    continue
+            img.set_pixel(px, py, col)
 
 func _get_target_zombie() -> Node:
     var main = get_tree().get_first_node_in_group("main")
