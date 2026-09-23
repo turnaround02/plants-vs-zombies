@@ -205,7 +205,7 @@ func _process(delta: float) -> void:
             attack_timer = 0.0
     else:
         # If eating, check if target plant still alive
-        if not target_plant or not target_plant.is_instance_valid() or target_plant.hp <= 0:
+        if not target_plant or not is_instance_valid(target_plant) or target_plant.hp <= 0:
             eating = false
             target_plant = null
             attack_timer = 0.0
@@ -235,7 +235,7 @@ func _process_ally(delta: float) -> void:
             target_plant = target
             attack_timer = 0.0
     else:
-        if not target_plant or not target_plant.is_instance_valid() or target_plant._dead:
+        if not target_plant or not is_instance_valid(target_plant) or target_plant._dead:
             eating = false
             target_plant = null
             attack_timer = 0.0

@@ -167,6 +167,17 @@ func spawn_sun_from_sky() -> void:
 	add_child(sun_instance)
 	sun_instance.add_to_group("suns")
 
+## 向日葵等产光植物在自身位置生成可见阳光（短下落 + 可点击收集）
+func spawn_sun_at(pos: Vector2, amount: int) -> void:
+	var sun_instance: Node2D = preload("res://scenes/Sun.tscn").instantiate()
+	sun_instance.position = pos
+	sun_instance.sun_amount = amount
+	# 植物产出的阳光下落更短、更快，避免飘到别处
+	if sun_instance.has_method("set_fall_behavior"):
+		sun_instance.set_fall_behavior(40.0, 4.0)
+	add_child(sun_instance)
+	sun_instance.add_to_group("suns")
+
 func add_sun(amount: int) -> void:
 	sun += amount
 	emit_signal("sun_changed", sun)
@@ -499,7 +510,7 @@ func _on_shovel_pressed() -> void:
 ## 铲除指定格的植物并回收 50% 阳光成本（与浏览器版 removePlant 对齐）
 func _remove_plant_with_refund(key: String) -> void:
 	var plant: Node = occupied_cells.get(key)
-	if plant == null or not plant.is_instance_valid():
+	if plant == null or not is_instance_valid(plant):
 		occupied_cells.erase(key)
 		return
 	var _pt2 = get_node_or_null("/root/PlantTypes")

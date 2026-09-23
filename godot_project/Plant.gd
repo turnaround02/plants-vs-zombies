@@ -92,8 +92,10 @@ func _process(delta: float) -> void:
             if sun_timer >= type.sun_produce_time:
                 sun_timer = 0.0
                 var main = get_tree().root.get_node("Main")
-                if main:
-                    main.add_sun(type.sun_amount)
+                if main and main.has_method("spawn_sun_at"):
+                    main.spawn_sun_at(position, int(type.get("sun_amount", 25)))
+                else:
+                    main.add_sun(int(type.get("sun_amount", 25))) if main else null
         "shooter":
             fire_timer += delta
             if fire_timer >= type.fire_rate:
@@ -110,7 +112,7 @@ func _process(delta: float) -> void:
                     var main = get_tree().root.get_node("Main")
                     if main:
                         for r in rows_to_shoot:
-                            main.shoot_projectile(r, position.x, type.damage)
+                            main.shoot_projectile(r, position.x + 20.0, type.damage)
         "wall":
             pass
         "bomb":
@@ -170,19 +172,15 @@ func _do_charm() -> void:
     queue_free()
 
 func _make_placeholder() -> void:
-    var img := Image.create(40, 40, false, Image.FORMAT_RGBA8)
-    # Different colors for different plant types
-    var color: Color = Color(0.3, 0.8, 0.3)  # default green
-    match type.get("behavior", ""):
-        "sunProducer":
-            color = Color(1.0, 0.85, 0.0)  # yellow for sunflower
-        "shooter":
-            color = Color(0.2, 0.6, 0.2)  # dark green for shooter
-        "wall":
-            color = Color(0.6, 0.4, 0.2)  # brown for wall
-    img.fill(color)
-    _sprite.texture = ImageTexture.create_from_image(img)
-    _sprite.offset = Vector2(20, 20)
+    _sprite.texture = _build_emoji_texture(type.get("icon", "🌱"), 48)
+
+## 用默认主题字体（含系统 emoji 回退）把 emoji 渲染成贴图，保证与卡片图标一致
+static func _build_emoji_texture(emoji: String, size: int) -> ImageTexture:
+    var font := ThemeDB.fallback_font
+    var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
+    var pos := Vector2(size * 0.5, size * 0.5 + font.get_height() * 0.35)
+    font.draw_string(img, pos, emoji, HORIZONTAL_ALIGNMENT_CENTER, -1, size, Color.WHITE)
+    return ImageTexture.create_from_image(img)
 
 func _get_target_zombie() -> Node:
     var main = get_tree().get_first_node_in_group("main")

@@ -10,6 +10,13 @@ extends Area2D
 var _timer: float = 0.0
 var _sprite: Sprite2D
 var _collision_shape: CollisionShape2D
+var _remaining_fall: float = -1.0  # 剩余下落距离；<0 表示一直下落（天空阳光）
+
+## 植物产出的阳光：快速短距离下落，到位置后停留一段时间（可点击收集）
+func set_fall_behavior(fall_px: float, linger_seconds: float) -> void:
+    fall_speed = 200.0
+    _remaining_fall = fall_px
+    lifetime = linger_seconds
 
 func _ready() -> void:
     _timer = 0.0
@@ -58,8 +65,13 @@ func _process(delta: float) -> void:
     if _timer >= lifetime:
         queue_free()
         return
-    # Move down
-    position.y += fall_speed * delta
+    # Move down（植物产出的阳光有下落距离上限，到点后原地停留）
+    if _remaining_fall >= 0.0:
+        var step: float = fall_speed * delta
+        _remaining_fall -= step
+        position.y += min(step, maxf(_remaining_fall, 0.0))
+    else:
+        position.y += fall_speed * delta
 
 # Called by the main game when the player clicks on this sun
 func collect() -> void:
