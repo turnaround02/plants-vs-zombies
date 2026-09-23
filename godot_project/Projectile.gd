@@ -25,7 +25,7 @@ func _process(delta: float) -> void:
     var main = get_tree().get_first_node_in_group("main")
     if main != null:
         for z in main.get_zombies():
-            if z.get("row_index") == row and z.get("_dead", false) == false:
+            if z.get("row_index") == row and not z.get("_dead"):
                 var dist = abs(z.position.x - position.x)
                 if dist < 25:  # collision radius
                     z.take_damage(damage)

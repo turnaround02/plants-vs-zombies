@@ -137,7 +137,7 @@ func _do_explosion() -> void:
         queue_free()
         return
     for z in main.get_zombies():
-        if z.get("_dead", false):
+        if z.get("_dead"):
             continue
         var dist = z.position.distance_to(position)
         if dist <= blast_radius:
@@ -153,7 +153,7 @@ func _do_charm() -> void:
     var best: Node = null
     var best_dist: float = 1e9
     for z in main.get_zombies():
-        if z.get("_dead", false) or z.get("is_ally", false):
+        if z.get("_dead") or z.get("is_ally"):
             continue
         if z.get("row_index") != row:
             continue
@@ -193,7 +193,7 @@ func _get_target_zombie() -> Node:
     var best: Node = null
     var best_dist: float = 1e9
     for z in main.get_zombies():
-        if z.get("row_index") != row or z.get("_dead", false):
+        if z.get("row_index") != row or z.get("_dead"):
             continue
         var dist: float = z.position.distance_to(position)
         if dist > shot_range:

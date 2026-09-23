@@ -195,7 +195,8 @@ func _process(delta: float) -> void:
         if plant:
             # 撑杆僵尸接近植物时一次性跳跃越障（短暂加速）
             var _zt = get_node_or_null("/root/ZombieTypes")
-            if not _jumped and _zt != null and _zt.get_type(type_id).get("jump_over_plant", false):
+            var _td: Dictionary = _zt.get_type(type_id) if _zt != null else {}
+            if not _jumped and _td.get("jump_over_plant", false):
                 _jumped = true
                 _jump_timer = 1.0
                 speed += 20.0
@@ -284,9 +285,10 @@ func take_damage(dmg: int) -> void:
     hp -= dmg
     # 读报僵尸首次被击后丢报加速（与浏览器版 newspaper 行为对齐）
     var _zt2 = get_node_or_null("/root/ZombieTypes")
-    if not _newspaper_hit and _zt2 != null and _zt2.get_type(type_id).get("newspaper_behavior", false):
+    var _td2: Dictionary = _zt2.get_type(type_id) if _zt2 != null else {}
+    if not _newspaper_hit and _td2.get("newspaper_behavior", false):
         _newspaper_hit = true
-        _news_speed = float(_zt2.get_type(type_id).get("speed_after_hit", 30.0))
+        _news_speed = float(_td2.get("speed_after_hit", 30.0))
         speed = _news_speed
     # Flash white on hit
     _sprite.modulate = Color(1, 1, 1, 1)

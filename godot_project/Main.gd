@@ -228,7 +228,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		# handle left button
 		# 统一世界坐标来源：阳光收集 + 植物放置
 		var world_pos: Vector2 = get_global_mouse_position()
-		print("LEFT CLICK at ", world_pos, " | selected=", selected_plant_type, " | suns=", get_tree().get_nodes_in_group("suns").size())
 		# 先尝试收集阳光（点中阳光就拾取，避免被误当成放置）
 		var collected: bool = _try_collect_sun(world_pos)
 		if collected:
@@ -237,18 +236,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			var grid_coord: Vector2 = grid.world_to_grid(world_pos)
 			if grid_coord.x >= 0 and grid_coord.y >= 0:
 				_try_place_plant(grid_coord.x, grid_coord.y)
-		else:
-			print("PLACE skipped: selected=[", selected_plant_type, "] grid_null=" + str(grid == null))
 
 func _try_place_plant(x: int, y: int) -> void:
-	print("_try_place_plant(", x, ",", y, ") sun=" + str(sun) + " selected=" + selected_plant_type)
 	var key: String = str(x) + "," + str(y)
 	if occupied_cells.has(key):
 		print("Cell already occupied")
 		return
 	var _pt = get_node_or_null("/root/PlantTypes")
 	if _pt == null:
-		print("PlantTypes autoload is NULL!")
 		return
 	var plant_data = _pt.get_type(selected_plant_type)
 	if plant_data.is_empty():
@@ -256,9 +251,7 @@ func _try_place_plant(x: int, y: int) -> void:
 		return
 	var cost: int = plant_data.get("cost", 0)
 	if sun < cost:
-		print("Not enough sun! need ", cost, " have ", sun)
 		return
-	print("PLACING plant", selected_plant_type, "at cell", x, y)
 	# Deduct sun
 	sun -= cost
 	emit_signal("sun_changed", sun)
