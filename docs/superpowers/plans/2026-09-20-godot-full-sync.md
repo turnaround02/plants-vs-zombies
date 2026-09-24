@@ -465,3 +465,23 @@ Task 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 顺序执行（依赖：T
 每个任务完成后：手动运行 `godot --headless -r res://godot_project`（或编辑器 F5）确认无脚本错误，再 commit。
 
 全部完成后：浏览器回归 `npm test` 13/13 全绿（确认浏览器文件零改动）。
+
+---
+
+## ✅ 完成状态（2026-09-24 复核）
+
+Task 1–9 **全部已在代码中实现**（各复选框见对应任务段落，实际代码位置见下表）。复核证据：
+
+| Task | 内容 | 代码位置 |
+|---|---|---|
+| 1 | 夜间第 9 关 | `Levels.gd` levels[9] |
+| 2 | 僵尸行为（魅惑/撑杆/读报） | `Zombie.gd` is_ally 分支、jump_over_plant、newspaper_behavior |
+| 3 | 植物取最近僵尸 | `Plant.gd _get_target_zombie` |
+| 4 | 夜间视觉 + 停掉天空阳光 | `Main.gd _apply_night_visuals`、`Main.tscn NightSky` |
+| 5 | 小推车（每行一次） | `Main.gd mowers_available`/`zombie_reached` |
+| 6 | 铲子按钮 + 50% 退款 | `HUD.tscn ShovelButton`、`Main.gd _remove_plant_with_refund` |
+| 7 | 暂停（Esc/P + 按钮） | `Main.gd _toggle_pause`、`HUD.tscn PauseButton` |
+| 8 | 检查点存档/恢复 | `Main.gd _save_checkpoint`/`_load_checkpoint` |
+| 9 | 关卡选择 + 胜利结算 | `Menu.gd`、`Main.gd _show_result_screen` |
+
+**后续差距补齐**（本计划未覆盖的 Godot 侧缺口）见：`docs/superpowers/plans/2026-09-24-godot-parity-gaps.md`（Task E/C/A/B/F/D 已全部实现并提交）。
