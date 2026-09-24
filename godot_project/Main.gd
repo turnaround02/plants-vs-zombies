@@ -139,6 +139,9 @@ func _on_menu_level_selected(level_id: int) -> void:
 	print("Started selected level ", level_id)
 
 func _on_plant_selected(type_name: String) -> void:
+	# 冷却中不可选中（与浏览器 isOnCooldown 前置拦截一致）
+	if plant_bar and plant_bar.has_method("is_on_cooldown") and plant_bar.is_on_cooldown(type_name):
+		return
 	selected_plant_type = type_name
 	print("Selected plant:", type_name)
 
@@ -153,6 +156,9 @@ func _on_sun_changed(amount: int) -> void:
 func _process(delta: float) -> void:
 	if not game_started or is_paused:
 		return
+	# 卡片冷却推进（毫秒）；暂停时提前 return，冷却自然冻结（与浏览器一致）
+	if plant_bar and plant_bar.has_method("update_cooldowns"):
+		plant_bar.update_cooldowns(delta * 1000.0)
 	# 夜间关卡：天空不掉阳光（与浏览器版 isNightLevel 逻辑对齐）
 	if not current_level.get("night", false):
 		sun_fall_timer += delta
@@ -281,6 +287,9 @@ func _try_place_plant(x: int, y: int) -> void:
 	plant_instance.position = pos
 	add_child(plant_instance)
 	occupied_cells[key] = plant_instance
+	# 放置成功后启动卡片冷却（与浏览器 onPlantPlaced → startCooldown 一致）
+	if plant_bar and plant_bar.has_method("start_cooldown"):
+		plant_bar.start_cooldown(selected_plant_type)
 	# Reset selected
 	selected_plant_type = ""
 	# Connect plant exiting signal to clean up occupied_cells
@@ -302,6 +311,11 @@ func _reset_level_state() -> void:
 	wave_state = 0
 	wave_prepare_timer = 0.0
 	game_won = false
+	# 重置卡片冷却（新关卡/重开时清空，与浏览器一致）
+	if plant_bar and plant_bar.has_method("deselect_all"):
+		plant_bar.deselect_all()
+	if plant_bar and "card_cooldowns" in plant_bar:
+		plant_bar.card_cooldowns.clear()
 	# 应用关卡初始阳光
 	sun = current_level.get("start_sun", sun_start)
 	emit_signal("sun_changed", sun)
