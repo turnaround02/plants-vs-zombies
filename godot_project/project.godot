@@ -27,6 +27,7 @@ InputManager="res://InputManager.gd"
 PlantTypes="res://PlantTypes.gd"
 ZombieTypes="res://ZombieTypes.gd"
 Levels="res://Levels.gd"
+Sound="res://Sound.gd"
 
 [rendering]
 

@@ -36,6 +36,9 @@ func _process(delta: float) -> void:
                     z.take_damage(damage)
                     if slow_factor > 0.0 and z.has_method("apply_slow"):
                         z.apply_slow(slow_factor, slow_duration)
+                    var snd = get_node_or_null("/root/Sound")
+                    if snd != null and snd.has_method("zombie_hit"):
+                        snd.zombie_hit()
                     _hit_zombies.append(z)
                     if not penetrate:
                         queue_free()

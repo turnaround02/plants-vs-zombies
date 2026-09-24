@@ -114,6 +114,10 @@ func _ready() -> void:
 	var pause_btn = hud_node.get_node_or_null("RightButtons/PauseButton") if hud_node else null
 	if pause_btn:
 		pause_btn.connect("pressed", Callable(self, "_toggle_pause"))
+	# 连接静音按钮（切换 Sound.enabled）
+	var mute_btn = hud_node.get_node_or_null("RightButtons/MuteButton") if hud_node else null
+	if mute_btn:
+		mute_btn.connect("pressed", Callable(self, "_on_mute_pressed").bind(mute_btn))
 	# Emit initial sun change (will trigger the callback)
 	emit_signal("sun_changed", sun)
 	if plant_bar:
@@ -145,6 +149,7 @@ func _on_plant_selected(type_name: String) -> void:
 	if plant_bar and plant_bar.has_method("is_on_cooldown") and plant_bar.is_on_cooldown(type_name):
 		return
 	selected_plant_type = type_name
+	_play_sound("click")
 	print("Selected plant:", type_name)
 
 func _on_sun_changed(amount: int) -> void:
@@ -292,6 +297,7 @@ func _try_place_plant(x: int, y: int) -> void:
 	# 放置成功后启动卡片冷却（与浏览器 onPlantPlaced → startCooldown 一致）
 	if plant_bar and plant_bar.has_method("start_cooldown"):
 		plant_bar.start_cooldown(selected_plant_type)
+	_play_sound("place_plant")
 	# Reset selected
 	selected_plant_type = ""
 	# Connect plant exiting signal to clean up occupied_cells
@@ -453,6 +459,7 @@ func _update_wave(delta: float) -> void:
 			wave_state = 1
 			wave_spawn_timer = 0.0
 			print("Wave ", current_wave_index + 1, " spawning started")
+			_play_sound("wave_start")
 	elif wave_state == 1:  # 按当前波次 delay 生成僵尸
 		wave_spawn_timer += delta
 		while zombies_spawned_in_wave < current_wave.size() and wave_spawn_timer >= float(current_wave[zombies_spawned_in_wave]["delay"]):
@@ -509,6 +516,7 @@ func _on_level_won() -> void:
 	_save_progress()
 	# 更新 HUD 并停止后续波次
 	_update_wave_label()
+	_play_sound("win")
 	# 停止自动推进：显示结算画面，由玩家手动进入下一关（与浏览器版对齐）
 	_show_result_screen()
 
@@ -532,6 +540,12 @@ func _on_game_won_ui() -> void:
 var mowers_available: Array = [true, true, true, true, true]  # 每行一次性小推车
 var shovel_mode: bool = false                                  # 铲子模式（HUD 按钮切换）
 var mower_sprites: Array = []                                  # 每行小推车精灵（可见化）
+
+## 音效触发helper：调用 Sound autoload 的对应方法（方法名与 js/sound.js 对齐）
+func _play_sound(method: String) -> void:
+	var snd = get_node_or_null("/root/Sound")
+	if snd != null and snd.has_method(method):
+		snd.call(method)
 
 ## 创建每行小推车精灵（程序化绘制，零素材；与浏览器 _drawMower 造型对齐）
 func _create_mower_sprites() -> void:
@@ -583,7 +597,18 @@ func _hide_mower(row: int) -> void:
 ## 铲子按钮切换
 func _on_shovel_pressed() -> void:
 	shovel_mode = not shovel_mode
+	_play_sound("click")
 	print("Shovel mode: ", shovel_mode)
+
+## 静音切换（对应浏览器 Sound.setEnabled）
+func _on_mute_pressed(btn: Button) -> void:
+	var snd = get_node_or_null("/root/Sound")
+	if snd == null:
+		return
+	var now_enabled: bool = not snd.is_enabled()
+	snd.set_enabled(now_enabled)
+	if btn:
+		btn.text = "🔊" if now_enabled else "🔇"
 
 ## 铲除指定格的植物并回收 50% 阳光成本（与浏览器版 removePlant 对齐）
 func _remove_plant_with_refund(key: String) -> void:
@@ -605,10 +630,12 @@ func zombie_reached(row: int = -1) -> void:
 		mowers_available[row] = false
 		_hide_mower(row)
 		_clear_row_zombies(row)
+		_play_sound("zombie_die")
 		print("Mower triggered in row ", row)
 		return
 	print("Zombie reached house! Game Over")
 	game_started = false
+	_play_sound("lose")
 	_show_game_over()
 
 ## 小推车触发：清除本行全部僵尸（计入得分）

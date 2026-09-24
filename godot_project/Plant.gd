@@ -118,6 +118,9 @@ func _process(delta: float) -> void:
                         for r in rows_to_shoot:
                             for _i in range(shots):
                                 main.shoot_projectile(r, position.x + 20.0, type.damage, slow_f, slow_d, pen)
+                        var snd = get_node_or_null("/root/Sound")
+                        if snd != null and snd.has_method("shoot"):
+                            snd.shoot()
         "wall":
             pass
         "bomb":
@@ -149,6 +152,9 @@ func _do_explosion() -> void:
         var dist = z.position.distance_to(position)
         if dist <= blast_radius:
             z.take_damage(damage)
+    var snd = get_node_or_null("/root/Sound")
+    if snd != null and snd.has_method("explosion"):
+        snd.explosion()
     queue_free()
 
 # 魅惑：找到相邻最近的一只僵尸并将其转换为友方（向右行走）
@@ -174,6 +180,9 @@ func _do_charm() -> void:
             best.set_charmed(true)
         elif best.has_method("charm"):
             best.charm()
+        var snd = get_node_or_null("/root/Sound")
+        if snd != null and snd.has_method("zombie_die"):
+            snd.zombie_die()
     queue_free()
 
 func _make_placeholder() -> void:

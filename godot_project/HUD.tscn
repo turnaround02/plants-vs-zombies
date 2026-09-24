@@ -45,7 +45,7 @@ custom_font_size = 24
 [node name="RightButtons" type="HBoxContainer" parent="."]
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -260.0
+offset_left = -340.0
 offset_top = 10.0
 offset_right = -10.0
 offset_bottom = 50.0
@@ -58,6 +58,10 @@ text = "暂停 ⏸"
 [node name="ShovelButton" type="Button" parent="RightButtons"]
 custom_minimum_size = Vector2(120, 0)
 text = "铲子 🪏"
+
+[node name="MuteButton" type="Button" parent="RightButtons"]
+custom_minimum_size = Vector2(60, 0)
+text = "🔊"
 
 [node name="PauseLabel" type="Label" parent="."]
 visible = false

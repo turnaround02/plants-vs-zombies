@@ -78,4 +78,7 @@ func collect() -> void:
     var main: Node = get_tree().root.get_node("Main")
     if main and main.has_method("add_sun"):
         main.add_sun(sun_amount)
+    var snd = get_node_or_null("/root/Sound")
+    if snd != null and snd.has_method("collect_sun"):
+        snd.collect_sun()
     queue_free()

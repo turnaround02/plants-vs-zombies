@@ -220,6 +220,9 @@ func _process(delta: float) -> void:
         if attack_timer >= attack_interval:
             attack_timer = 0.0
             target_plant.take_damage(attack_damage)
+            var snd = get_node_or_null("/root/Sound")
+            if snd != null and snd.has_method("zombie_eat"):
+                snd.zombie_eat()
             if target_plant.hp <= 0:
                 eating = false
                 target_plant = null
@@ -249,6 +252,9 @@ func _process_ally(delta: float) -> void:
         if attack_timer >= attack_interval:
             attack_timer = 0.0
             target_plant.take_damage(attack_damage)
+            var snd2 = get_node_or_null("/root/Sound")
+            if snd2 != null and snd2.has_method("zombie_eat"):
+                snd2.zombie_eat()
 
 ## 友方目标：同排、右侧、未死、非友方的普通僵尸
 func _find_ally_target() -> Node:
@@ -308,6 +314,9 @@ func take_damage(dmg: int) -> void:
     if hp <= 0 and not _dead:
         _dead = true
         _death_timer = 0.0
+        var snd3 = get_node_or_null("/root/Sound")
+        if snd3 != null and snd3.has_method("zombie_die"):
+            snd3.zombie_die()
 
 ## 是否被攻击致死（用于 Main 判断"击杀得分"，区别于过关清理 queue_free）
 func is_killed() -> bool:
