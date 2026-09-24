@@ -16,6 +16,7 @@ var sun_fall_timer: float
 var hud_sun_label: Label
 var hud_wave_label: Label
 var hud_score_label: Label
+var hud_wave_progress: ProgressBar
 
 # 得分统计（与浏览器版 Task 6 对齐）
 var score: int = 0
@@ -67,6 +68,7 @@ func _ready() -> void:
 		hud_sun_label = hud_node.get_node("SunLabel")
 		hud_wave_label = hud_node.get_node("WaveLabel")
 		hud_score_label = hud_node.get_node("ScoreLabel")
+		hud_wave_progress = hud_node.get_node_or_null("WaveProgress")
 		if hud_sun_label:
 			hud_sun_label.text = "Sun: " + str(sun)
 		else:
@@ -498,6 +500,11 @@ func _update_wave_label() -> void:
 			hud_wave_label.text = "关卡 " + str(current_level_id) + " 完成！"
 		else:
 			hud_wave_label.text = "关卡 " + str(current_level_id) + " 波次 " + str(current_wave_index + 1) + "/" + str(current_level["waves"].size())
+	# 波次进度条：当前波 / 总波（与浏览器 ui.js 渲染一致）
+	if hud_wave_progress:
+		var total_waves: int = current_level["waves"].size() if not current_level.is_empty() else 0
+		var cur: int = mini(current_wave_index + 1, total_waves)
+		hud_wave_progress.value = (float(cur) / float(total_waves) * 100.0) if total_waves > 0 else 0.0
 
 func _on_game_won_ui() -> void:
 	# 胜利状态下的 UI 钩子（可扩展为弹出胜利提示）
