@@ -50,7 +50,6 @@ var current_wave_index: int = 0
 var current_level: Dictionary = {}     # 当前关卡数据 {name, start_sun, waves}
 var current_wave: Array = []           # 当前波次的僵尸队列 [{type, delay}]
 var zombies_spawned_in_wave: int = 0  # 当前波次已生成数
-var zombies_alive: int = 0
 var wave_spawn_timer: float = 0.0
 var wave_state: int = 0  # 0 = preparing(波次预告), 1 = spawning(按 delay 生成), 2 = 波次结束等待
 var wave_prepare_time: float = 2.0    # 波次预告/间歇时长（秒）
@@ -314,7 +313,6 @@ func _reset_level_state() -> void:
 		return
 	current_wave = current_level["waves"][0]
 	zombies_spawned_in_wave = 0
-	zombies_alive = 0
 	wave_spawn_timer = 0.0
 	wave_state = 0
 	wave_prepare_timer = 0.0
@@ -420,7 +418,6 @@ func _start_level(level_id: int) -> void:
 	for z in get_tree().get_nodes_in_group("zombies"):
 		z.queue_free()
 	occupied_cells.clear()
-	zombies_alive = 0
 	call_deferred("_start_wave_prepare")
 
 ## 夜间视觉：深色背景 + 静态星空
@@ -465,8 +462,8 @@ func _update_wave(delta: float) -> void:
 		while zombies_spawned_in_wave < current_wave.size() and wave_spawn_timer >= float(current_wave[zombies_spawned_in_wave]["delay"]):
 			spawn_zombie(current_wave[zombies_spawned_in_wave]["type"])
 			zombies_spawned_in_wave += 1
-		# 全部生成且场上无僵尸时，进入波次间歇
-		if zombies_spawned_in_wave >= current_wave.size() and zombies_alive == 0:
+		# 全部生成且场上无僵尸时，进入波次间歇（派生计数）
+		if zombies_spawned_in_wave >= current_wave.size() and _count_alive_zombies() == 0:
 			wave_state = 2
 			wave_prepare_timer = 0.0
 			print("Wave ", current_wave_index + 1, " complete")
@@ -493,17 +490,24 @@ func spawn_zombie(zombie_type: String = "normal") -> void:
 	var y = grid.grid_to_world(Vector2(0, row)).y - grid.cell_height / 2
 	zombie_instance.position = Vector2(start_x, y)
 	add_child(zombie_instance)
-	zombies_alive += 1
 	# 传入僵尸实例，以便在 tree_exiting 时判断是否被击杀并累计得分
 	zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited").bind(zombie_instance))
 
 func _on_zombie_exited(zombie: Node) -> void:
-	zombies_alive -= 1
+	# 存活数改为派生计数，此处只负责击杀计分
 	# 判断是"被击杀"而非"自然消失"（如过关清理 queue_free 也会触发 tree_exiting）
 	# Zombie.gd 中 _dead 为 true 表示被攻击致死；自然走到 x<=0 时调用 zombie_reached 但不置 _dead
 	if zombie and zombie.has_method("is_killed") and zombie.is_killed():
 		record_kill(zombie.type_id)
 	# 若全部生成且无存活僵尸，将在 _update_wave 中检测到并进入波次间歇
+
+## 派生计数：统计场上未死亡的僵尸数（含友方），替代易失同步的手动计数器
+func _count_alive_zombies() -> int:
+	var n: int = 0
+	for z in get_tree().get_nodes_in_group("zombies"):
+		if z != null and is_instance_valid(z) and not z.get("_dead"):
+			n += 1
+	return n
 
 ## 当前关卡全部波次清空，触发胜利
 func _on_level_won() -> void:
@@ -644,7 +648,6 @@ func _clear_row_zombies(row: int) -> void:
 		if z.row_index == row:
 			record_kill(z.type_id)
 			z.queue_free()
-	zombies_alive = 0
 
 ## ===== 检查点存档（基础版：每关中段自动快照，失败可恢复） =====
 const CHECKPOINT_PATH := "user://checkpoint.cfg"
@@ -705,7 +708,6 @@ func _load_checkpoint() -> void:
 	for z in get_tree().get_nodes_in_group("zombies"):
 		z.queue_free()
 	occupied_cells.clear()
-	zombies_alive = 0
 	# 恢复状态
 	current_level_id = int(data.get("level_id", 1))
 	current_wave_index = int(data.get("wave_index", 0))
@@ -739,7 +741,6 @@ func _load_checkpoint() -> void:
 		if "hp" in zdata:
 			zombie_instance.hp = int(zdata["hp"])
 		add_child(zombie_instance)
-		zombies_alive += 1
 		zombie_instance.connect("tree_exiting", Callable(self, "_on_zombie_exited").bind(zombie_instance))
 	# 重新开始波次
 	game_started = true
