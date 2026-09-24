@@ -59,23 +59,23 @@ func take_damage(dmg: float) -> void:
     if _sprite:
         _sprite.modulate = Color(1, 0.2, 0.2, 1)
         _hit_flash_timer = 0.15
+    queue_redraw()  # 血量变化后刷新血条
     if hp <= 0:
         alive = false
         queue_free()
 
 func _draw() -> void:
-    # Draw HP bar if damaged
-    if hp < max_hp:
-        var bar_width := 36.0
-        var bar_height := 4.0
-        var bar_x := position.x - bar_width / 2
-        var bar_y := position.y - 30.0
-        # Background
-        draw_rect(Rect2(bar_x, bar_y, bar_width, bar_height), Color(0.2, 0.2, 0.2, 0.8))
-        # Health fill
-        var health_width := bar_width * (hp / max_hp)
-        var health_color = Color(0.3, 0.8, 0.3) if hp / max_hp > 0.5 else Color(0.8, 0.3, 0.3)
-        draw_rect(Rect2(bar_x, bar_y, health_width, bar_height), health_color)
+    # 常驻血条（与浏览器 js/plants.js 对齐：40×5，位于 y-38，局部坐标）
+    var bar_width := 40.0
+    var bar_height := 5.0
+    var bar_x := -bar_width / 2
+    var bar_y := -38.0
+    # 背景
+    draw_rect(Rect2(bar_x, bar_y, bar_width, bar_height), Color(0, 0, 0, 0.5))
+    # 血量填充（>50% 绿，否则红）
+    var ratio: float = clampf(hp / max_hp, 0.0, 1.0)
+    var health_color: Color = Color(0.3, 0.69, 0.31) if ratio > 0.5 else Color(0.96, 0.26, 0.21)
+    draw_rect(Rect2(bar_x, bar_y, bar_width * ratio, bar_height), health_color)
 
 func _process(delta: float) -> void:
     if not alive:
