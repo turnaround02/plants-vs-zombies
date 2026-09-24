@@ -179,6 +179,7 @@ func _process(delta: float) -> void:
             slow_factor = 1.0
             # 恢复底色：友军保持魅惑蓝，普通僵尸恢复白
             _sprite.modulate = Color(0.4, 0.7, 1.0) if is_ally else Color(1, 1, 1, 1)
+            queue_redraw()  # 减速结束后移除蓝色覆盖
     
     # 友方（魅惑）僵尸：右行，攻击普通僵尸，不再吃植物
     if is_ally:
@@ -281,12 +282,14 @@ func set_charmed(ally: bool) -> void:
     eating = false
     target_plant = null
     _sprite.modulate = Color(0.4, 0.7, 1.0)  # 蓝色标记魅惑状态
+    queue_redraw()  # 魅惑状态变化后刷新光环
 
 ## 寒冰减速：factor 为速度倍率（0.5 = 半速），duration 秒（与浏览器 applySlow 对齐）
 func apply_slow(factor: float, duration: float) -> void:
     slow_factor = factor
     slow_timer = duration
     _sprite.modulate = Color(0.6, 0.85, 1.0)  # 冰蓝标记减速状态
+    queue_redraw()  # 减速状态变化后刷新覆盖
 
 func _find_target_plant() -> Node:
     var plants = get_tree().get_nodes_in_group("plants")
@@ -312,6 +315,7 @@ func take_damage(dmg: int) -> void:
     # Flash white on hit
     _sprite.modulate = Color(1, 1, 1, 1)
     _hit_flash_timer = 0.15
+    queue_redraw()  # 血量变化后刷新血条
     if hp <= 0 and not _dead:
         _dead = true
         _death_timer = 0.0
@@ -322,3 +326,40 @@ func take_damage(dmg: int) -> void:
 ## 是否被攻击致死（用于 Main 判断"击杀得分"，区别于过关清理 queue_free）
 func is_killed() -> bool:
     return _dead
+
+## 状态可视化：常驻血条 + 魅惑紫色光环/标识 + 减速蓝色覆盖（对齐浏览器 js/zombies.js）
+func _draw() -> void:
+    # 死亡时不绘制（精灵自行淡出）
+    if _dead:
+        return
+    # 常驻血条：36×4，位于僵尸头顶上方（局部原点 = 僵尸中心，对齐浏览器 y-40）
+    var bar_w := 36.0
+    var bar_h := 4.0
+    var bar_x := -bar_w / 2.0
+    var bar_y := -40.0
+    draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0, 0, 0, 0.5))
+    var ratio: float = clampf(float(hp) / float(max_hp), 0.0, 1.0)
+    var bar_col: Color = Color(0.3, 0.69, 0.31) if ratio > 0.5 else Color(0.96, 0.26, 0.21)
+    draw_rect(Rect2(bar_x, bar_y, bar_w * ratio, bar_h), bar_col)
+    # 减速蓝色覆盖（椭圆填充，居中于僵尸身体）
+    if slow_timer > 0.0:
+        _draw_ellipse(Vector2(0, 0), Vector2(20, 30), Color(0.31, 0.76, 0.97, 0.25), true)
+    # 魅惑：紫色光环（椭圆描边）+ 头顶紫色圆环标识（替代 🌀 字形）
+    if is_ally:
+        _draw_ellipse(Vector2(0, 0), Vector2(22, 32), Color(0.61, 0.15, 0.69, 0.2), true)
+        _draw_ellipse(Vector2(0, 0), Vector2(22, 32), Color(0.61, 0.15, 0.69, 0.5), false)
+        draw_arc(Vector2(0, -52), 7.0, 0.0, TAU, 24, Color(0.8, 0.4, 0.9), 2.0)
+
+## 绘制椭圆：filled=true 填充，false 描边
+func _draw_ellipse(center: Vector2, radii: Vector2, col: Color, filled: bool) -> void:
+    var pts := PackedVector2Array()
+    var seg := 28
+    for i in range(seg):
+        var a: float = TAU * float(i) / float(seg)
+        pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
+    if filled:
+        draw_colored_polygon(pts, col)
+    else:
+        var loop := pts.duplicate()
+        loop.append(pts[0])
+        draw_polyline(loop, col, 2.0)
