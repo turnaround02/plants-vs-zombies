@@ -7,7 +7,7 @@ var types: Dictionary = {
         "icon": "🌻",
         "cost": 50,
         "hp": 100,
-        "sun_produce_time": 8.0,
+        "sun_produce_time": 9.0,
         "sun_amount": 25,
         "behavior": "sunProducer"
     },
@@ -20,13 +20,6 @@ var types: Dictionary = {
         "fire_rate": 1.2,
         "range": 400,
         "behavior": "shooter"
-    },
-    "wall-nut": {
-        "name": "Wall-nut",
-        "icon": "🥜",
-        "cost": 50,
-        "hp": 400,
-        "behavior": "wall"
     },
     # 寒冰射手：发射冰冻豌豆，附加减速
     "snowpea": {

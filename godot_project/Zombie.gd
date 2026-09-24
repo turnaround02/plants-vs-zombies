@@ -24,7 +24,6 @@ var score: int = 0                    # 击杀得分
 # 行为标志（与浏览器版对齐）
 var is_ally: bool = false             # 魅惑后转为友方：右行 + 攻击普通僵尸
 var _jumped: bool = false             # 撑杆是否已跳跃越障
-var _jump_timer: float = 0.0         # 跳跃冲刺剩余时间
 var _newspaper_hit: bool = false      # 读报是否已被首次击中
 var _news_speed: float = 0.0         # 读报加速后的速度（来自 ZombieTypes.speed_after_hit）
 
@@ -175,11 +174,7 @@ func _process(delta: float) -> void:
         _process_ally(delta)
         return
     
-    # 撑杆跳跃冲刺计时
-    if _jump_timer > 0:
-        _jump_timer -= delta
-        if _jump_timer <= 0:
-            speed -= 20.0  # 冲刺结束，回落原速
+    # 撑杆跳跃已改为瞬间跳过（见下方 _find_target_plant 分支），无需冲刺计时
     if not eating:
         position.x -= speed * delta
     # Check if we have reached the house
@@ -190,16 +185,17 @@ func _process(delta: float) -> void:
     # Update timers
     attack_timer += delta
     # Find target plant if not eating
+    # 撑杆僵尸：接近植物时一帧内瞬间跳过（不啃食，与浏览器版对齐）
     if not eating:
         var plant = _find_target_plant()
         if plant:
-            # 撑杆僵尸接近植物时一次性跳跃越障（短暂加速）
             var _zt = get_node_or_null("/root/ZombieTypes")
             var _td: Dictionary = _zt.get_type(type_id) if _zt != null else {}
             if not _jumped and _td.get("jump_over_plant", false):
                 _jumped = true
-                _jump_timer = 1.0
-                speed += 20.0
+                # 越过植物并继续前进（落点 = 植物左侧一格）
+                position.x = plant.position.x - 100.0
+                return
             eating = true
             target_plant = plant
             attack_timer = 0.0

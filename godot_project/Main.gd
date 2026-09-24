@@ -184,12 +184,12 @@ func add_sun(amount: int) -> void:
 	sun += amount
 	emit_signal("sun_changed", sun)
 
-## 阳光收集：点击位置附近（半径 40px）找最近的阳光直接拾取
+## 阳光收集：点击位置附近（半径 35px，与浏览器 SUN_COLLECT_RADIUS 对齐）找最近的阳光直接拾取
 ## 返回 true 表示拾取到了阳光（调用方应跳过后续放置逻辑）
 func _try_collect_sun(click_pos: Vector2) -> bool:
 	var suns = get_tree().get_nodes_in_group("suns")
 	var best: Node = null
-	var best_d: float = 40.0 * 40.0
+	var best_d: float = 35.0 * 35.0
 	for s in suns:
 		if s == null or not is_instance_valid(s):
 			continue
