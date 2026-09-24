@@ -26,6 +26,8 @@ var is_ally: bool = false             # 魅惑后转为友方：右行 + 攻击�
 var _jumped: bool = false             # 撑杆是否已跳跃越障
 var _newspaper_hit: bool = false      # 读报是否已被首次击中
 var _news_speed: float = 0.0         # 读报加速后的速度（来自 ZombieTypes.speed_after_hit）
+var slow_factor: float = 1.0          # 减速倍率（寒冰豌豆，1.0 = 正常）
+var slow_timer: float = 0.0           # 减速剩余时间（秒）
 
 func _ready() -> void:
     add_to_group("zombies")
@@ -169,6 +171,14 @@ func _process(delta: float) -> void:
         if _hit_flash_timer <= 0:
             _sprite.modulate = Color(1, 1, 1, 1)
     
+    # 减速状态（寒冰豌豆）：计时结束恢复常速
+    if slow_timer > 0:
+        slow_timer -= delta
+        if slow_timer <= 0:
+            slow_factor = 1.0
+            # 恢复底色：友军保持魅惑蓝，普通僵尸恢复白
+            _sprite.modulate = Color(0.4, 0.7, 1.0) if is_ally else Color(1, 1, 1, 1)
+    
     # 友方（魅惑）僵尸：右行，攻击普通僵尸，不再吃植物
     if is_ally:
         _process_ally(delta)
@@ -176,7 +186,7 @@ func _process(delta: float) -> void:
     
     # 撑杆跳跃已改为瞬间跳过（见下方 _find_target_plant 分支），无需冲刺计时
     if not eating:
-        position.x -= speed * delta
+        position.x -= speed * slow_factor * delta
     # Check if we have reached the house
     if position.x <= 0:
         var main = get_tree().root.get_node("Main")
@@ -264,6 +274,12 @@ func set_charmed(ally: bool) -> void:
     eating = false
     target_plant = null
     _sprite.modulate = Color(0.4, 0.7, 1.0)  # 蓝色标记魅惑状态
+
+## 寒冰减速：factor 为速度倍率（0.5 = 半速），duration 秒（与浏览器 applySlow 对齐）
+func apply_slow(factor: float, duration: float) -> void:
+    slow_factor = factor
+    slow_timer = duration
+    _sprite.modulate = Color(0.6, 0.85, 1.0)  # 冰蓝标记减速状态
 
 func _find_target_plant() -> Node:
     var plants = get_tree().get_nodes_in_group("plants")

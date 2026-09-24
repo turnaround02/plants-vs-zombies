@@ -691,11 +691,14 @@ func _on_game_over_restart() -> void:
 	call_deferred("_start_wave_prepare")
 	print("Level restarted")
 
-func shoot_projectile(from_row: int, from_x: float, damage: int) -> void:
+func shoot_projectile(from_row: int, from_x: float, damage: int, slow_factor: float = 0.0, slow_duration: float = 0.0, penetrate: bool = false) -> void:
 	var proj_scene = preload("res://scenes/Projectile.tscn")
 	var proj_instance = proj_scene.instantiate()
 	proj_instance.row = from_row
 	proj_instance.damage = damage
+	proj_instance.slow_factor = slow_factor
+	proj_instance.slow_duration = slow_duration
+	proj_instance.penetrate = penetrate
 	proj_instance.process_mode = Node.PROCESS_MODE_PAUSABLE
 	var y = grid.grid_to_world(Vector2(0, from_row)).y - grid.cell_height / 2
 	proj_instance.position = Vector2(from_x, y)

@@ -111,8 +111,13 @@ func _process(delta: float) -> void:
                 if target:
                     var main = get_tree().root.get_node("Main")
                     if main:
+                        var shots: int = int(type.get("shots_per_fire", 1))
+                        var slow_f: float = float(type.get("slow_factor", 0.0))
+                        var slow_d: float = float(type.get("slow_duration", 0.0))
+                        var pen: bool = bool(type.get("penetrate", false))
                         for r in rows_to_shoot:
-                            main.shoot_projectile(r, position.x + 20.0, type.damage)
+                            for _i in range(shots):
+                                main.shoot_projectile(r, position.x + 20.0, type.damage, slow_f, slow_d, pen)
         "wall":
             pass
         "bomb":
