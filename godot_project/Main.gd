@@ -89,6 +89,8 @@ func _ready() -> void:
 	grid = get_node("Grid")
 	if not grid:
 		push_error("Could not find Grid node")
+	else:
+		_create_mower_sprites()
 	# Get PlantBar and connect signal
 	plant_bar = get_node("PlantUI/PlantBar")
 	if not plant_bar:
@@ -321,6 +323,9 @@ func _reset_level_state() -> void:
 	emit_signal("sun_changed", sun)
 	# 重置每行小推车
 	mowers_available = [true, true, true, true, true]
+	for spr in mower_sprites:
+		if spr and is_instance_valid(spr):
+			spr.visible = true
 	_update_wave_label()
 
 ## 暂停切换（键盘 Esc/P 或 HUD 按钮）
@@ -526,6 +531,54 @@ func _on_game_won_ui() -> void:
 
 var mowers_available: Array = [true, true, true, true, true]  # 每行一次性小推车
 var shovel_mode: bool = false                                  # 铲子模式（HUD 按钮切换）
+var mower_sprites: Array = []                                  # 每行小推车精灵（可见化）
+
+## 创建每行小推车精灵（程序化绘制，零素材；与浏览器 _drawMower 造型对齐）
+func _create_mower_sprites() -> void:
+	mower_sprites.clear()
+	var tex := _build_mower_texture()
+	for r in range(5):
+		var spr := Sprite2D.new()
+		spr.texture = tex
+		# 小推车停在网格最左侧（房屋与第一列之间）
+		var cy: float = grid.grid_to_world(Vector2(0, r)).y
+		spr.position = Vector2(28.0, cy)
+		spr.process_mode = Node.PROCESS_MODE_PAUSABLE
+		add_child(spr)
+		mower_sprites.append(spr)
+
+## 程序化绘制小推车：红色机身 + 两侧刀片 + 黄色车头标识
+func _build_mower_texture() -> ImageTexture:
+	var W := 44
+	var H := 32
+	var img := Image.create(W, H, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var body := Color(0.72, 0.11, 0.11)
+	var blade := Color(0.62, 0.62, 0.62)
+	var gold := Color(1.0, 0.84, 0.0)
+	# 机身
+	for py in range(9, 23):
+		for px in range(6, 38):
+			img.set_pixel(px, py, body)
+	# 两侧刀片（圆环）
+	for py in range(H):
+		for px in range(W):
+			var d1: float = Vector2(px - 6, py - 16).length()
+			var d2: float = Vector2(px - 38, py - 16).length()
+			if abs(d1 - 8.0) < 1.6 or abs(d2 - 8.0) < 1.6:
+				img.set_pixel(px, py, blade)
+	# 车头黄色标识
+	for py in range(12, 16):
+		for px in range(16, 28):
+			img.set_pixel(px, py, gold)
+	return ImageTexture.create_from_image(img)
+
+## 小推车触发后隐藏该行精灵
+func _hide_mower(row: int) -> void:
+	if row >= 0 and row < mower_sprites.size():
+		var spr = mower_sprites[row]
+		if spr and is_instance_valid(spr):
+			spr.visible = false
 
 ## 铲子按钮切换
 func _on_shovel_pressed() -> void:
@@ -550,6 +603,7 @@ func zombie_reached(row: int = -1) -> void:
 	# 僵尸到达最左：先查本行小推车，可用则清行，否则失败
 	if row >= 0 and row < 5 and mowers_available[row]:
 		mowers_available[row] = false
+		_hide_mower(row)
 		_clear_row_zombies(row)
 		print("Mower triggered in row ", row)
 		return
