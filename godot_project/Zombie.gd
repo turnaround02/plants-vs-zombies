@@ -156,12 +156,13 @@ func _tri_points(ax: int, ay: int, bx: int, by: int, cx: int, cy: int) -> Array:
     return pts
 
 func _process(delta: float) -> void:
-    # Death animation - fade out and rotate
+    # Death animation - fade out and rotate (对齐浏览器 js/zombies.js：0.8s 内旋转 -90° 并淡出)
     if _dead:
         _death_timer += delta
-        _sprite.modulate.a = 1.0 - (_death_timer / 0.5)
-        rotation = sign(position.x) * _death_timer * 3.14
-        if _death_timer >= 0.5:
+        var progress: float = minf(_death_timer / 0.8, 1.0)
+        _sprite.modulate.a = 1.0 - progress
+        rotation = -progress * PI / 2.0
+        if _death_timer >= 0.8:
             queue_free()
             return
     
