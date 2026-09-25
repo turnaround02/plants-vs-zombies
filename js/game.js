@@ -57,7 +57,7 @@ class Game {
   // 生命周期
   // ==========================================================
 
-  startLevel(levelId) {
+  startLevel(levelId, endless = false) {
     const level = LEVELS[levelId];
     this.sun = level.startSun;
     this.plants = [];
@@ -76,8 +76,12 @@ class Game {
     this.gameTime = 0;
     this.score = 0;
     this.kills = 0;
+    this.endlessMode = !!endless;
+    this.lastStars = 0;
+    this.lastMowersUsed = 0;
+    this.lastBonus = 0;
 
-    this.levelManager = new LevelManager(levelId);
+    this.levelManager = new LevelManager(levelId, endless);
     this.levelManager.start(this);
 
     this.state = 'playing';
@@ -738,8 +742,13 @@ class Game {
   // 实体生成
   // ==========================================================
 
-  spawnZombie(typeId, row) {
+  spawnZombie(typeId, row, hpMul = 1) {
     const zombie = new Zombie(typeId, row);
+    if (hpMul !== 1) {
+      // 无尽模式：按波次递增僵尸 HP
+      zombie.hp = Math.round(zombie.hp * hpMul);
+      zombie.maxHp = Math.round(zombie.maxHp * hpMul);
+    }
     this.zombies.push(zombie);
   }
 

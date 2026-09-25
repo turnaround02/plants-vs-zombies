@@ -698,6 +698,94 @@ async function runTests() {
     // 清档还原，避免污染
     await page.evaluate(() => localStorage.removeItem('pvz_save_v1'));
 
+    // ==========================================
+    // 测试 19: 无尽模式（无限波次 + 难度递增）
+    // ==========================================
+    console.log('\n📋 测试 19: 无尽模式');
+    const endlessResult = await page.evaluate(() => {
+      const g = window.__game;
+      g.startLevel(1, true);
+      if (!g.levelManager.endless) return { ok: false, reason: 'levelManager.endless 未置位' };
+      if (g.levelManager.totalWaves !== Infinity) return { ok: false, reason: '无尽 totalWaves 应为 Infinity' };
+      const q1 = g.levelManager._generateEndlessWave(1);
+      const q2 = g.levelManager._generateEndlessWave(2);
+      const q10 = g.levelManager._generateEndlessWave(10);
+      if (q1.length >= q2.length) return { ok: false, reason: `波次数量未递增: w1=${q1.length} w2=${q2.length}` };
+      if (q2.length >= q10.length) return { ok: false, reason: `波次数量未递增: w2=${q2.length} w10=${q10.length}` };
+      if (q1[0].hpMul >= q10[0].hpMul) return { ok: false, reason: '无尽僵尸 HP 未随波次递增' };
+      g.levelManager.waveIndex = 100;
+      g.levelManager.waveState = 'active';
+      g.zombies = [];
+      g.levelManager.update(0, g);
+      if (g.levelManager.allWavesComplete) return { ok: false, reason: '无尽模式不应触发通关' };
+      const info = g.levelManager.getWaveInfo();
+      return {
+        ok: true,
+        w1: q1.length, w2: q2.length, w10: q10.length,
+        hpW1: q1[0].hpMul, hpW10: q10[0].hpMul,
+        infoEndless: info.endless === true,
+      };
+    });
+    console.log('  无尽模式:', JSON.stringify(endlessResult));
+    if (!endlessResult.ok) throw new Error(`无尽模式异常: ${endlessResult.reason || JSON.stringify(endlessResult)}`);
+    if (!endlessResult.infoEndless) throw new Error('无尽模式 getWaveInfo 应带 endless 标志');
+
+    const endlessUi = await page.evaluate(() => {
+      window.__ui.currentLevel = 1;
+      window.__ui.endlessMode = true;
+      window.__ui.updateLevelInfo();
+      const lvlText = document.getElementById('level-info').textContent;
+      window.__ui.game.startLevel(1, true);
+      const stateAfter = window.__ui.game.state;
+      return { lvlText, stateAfter, hasBtn: !!document.getElementById('endless-btn') };
+    });
+    console.log('  无尽 UI:', JSON.stringify(endlessUi));
+    if (!endlessUi.hasBtn) throw new Error('无尽模式按钮不存在!');
+    if (!endlessUi.lvlText.includes('无尽')) throw new Error(`无尽模式 level-info 应含"无尽", 实际「${endlessUi.lvlText}」`);
+    if (endlessUi.stateAfter !== 'playing') throw new Error(`无尽模式启动后应为 playing, 实际 ${endlessUi.stateAfter}`);
+
+    await page.evaluate(() => {
+      const g = window.__game;
+      g.startLevel(1, false);
+      g.endlessMode = false;
+    });
+
+    // ==========================================
+    // 测试 20: 静音按钮 + 持久化
+    // ==========================================
+    console.log('\n📋 测试 20: 静音按钮 + 持久化');
+    const muteResult = await page.evaluate(() => {
+      const btn = document.getElementById('mute-btn');
+      if (!btn) return { ok: false, reason: 'mute-btn 不存在' };
+      // Sound 是全局 const，evaluate 上下文通过 window 不可直接见；改用 window.__game 关联的 UI 读不到 enabled，
+      // 因此通过 DOM 按钮文本 + localStorage 判断：初始按钮文本反映初始 enabled
+      const initialText = btn.textContent;
+      const initialEnabled = initialText === '🔊';
+      btn.click();
+      const afterText = btn.textContent;
+      const afterEnabled = afterText === '🔊';
+      const persisted = localStorage.getItem('pvz_muted_v1');
+      btn.click();
+      const restoreText = btn.textContent;
+      const restoreEnabled = restoreText === '🔊';
+      return {
+        ok: (afterEnabled !== initialEnabled) && (restoreEnabled === initialEnabled) && (persisted === '0' || persisted === '1'),
+        initialEnabled, afterEnabled, restoreEnabled, persisted,
+      };
+    });
+    console.log('  静音按钮:', JSON.stringify(muteResult));
+    if (!muteResult.ok) throw new Error(`静音按钮异常: ${muteResult.reason || JSON.stringify(muteResult)}`);
+    // 验证 localStorage 持久化值与还原后状态一致（还原后应为初始 enabled 状态）
+    const persistCheck = await page.evaluate(() => {
+      const persisted = localStorage.getItem('pvz_muted_v1');
+      const btnText = document.getElementById('mute-btn').textContent;
+      const enabled = btnText === '🔊';
+      // 还原后 enabled=true → persisted 应为 '0'；enabled=false → persisted '1'
+      return { ok: enabled === (persisted !== '1'), persisted, enabled };
+    });
+    if (!persistCheck.ok) throw new Error(`静音持久化状态与按钮不一致: ${JSON.stringify(persistCheck)}`);
+    await page.evaluate(() => localStorage.removeItem('pvz_muted_v1'));
+
     await page.screenshot({ path: path.join(SHOT_DIR, '14-mobile-scaled.png') });
     console.log('  ✅ 移动端缩放截图已保存: test/screenshots/14-mobile-scaled.png');
 

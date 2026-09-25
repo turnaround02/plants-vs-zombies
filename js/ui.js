@@ -6,6 +6,7 @@ class UI {
   constructor(game) {
     this.game = game;
     this.currentLevel = 1;
+    this.endlessMode = false; // 无尽模式标志
     this.totalLevels = Object.keys(LEVELS).length;
     this.isPaused = false;
 
@@ -20,6 +21,7 @@ class UI {
     this.resultTitle = document.getElementById('result-title');
     this.resultText = document.getElementById('result-text');
     this.startBtn = document.getElementById('start-btn');
+    this.endlessBtn = document.getElementById('endless-btn');
     this.restartBtn = document.getElementById('restart-btn');
     this.checkpointBtn = document.getElementById('checkpoint-btn');
     this.pauseBtn = document.getElementById('pause-btn');
@@ -31,6 +33,7 @@ class UI {
     this.levelGrid = document.getElementById('level-grid');
     this.backBtn = document.getElementById('back-btn');
     this.shovelBtn = document.getElementById('shovel-btn');
+    this.muteBtn = document.getElementById('mute-btn');
 
     // 卡片冷却状态
     this.cardCooldowns = {};
@@ -46,6 +49,7 @@ class UI {
     // 绑定 UI 事件
     this.bindEvents();
     this.bindShovel();
+    this.bindMute();
 
     // 初始化卡片
     this.buildPlantCards();
@@ -66,14 +70,25 @@ class UI {
       Sound.init();
       Sound.click();
       this.currentLevel = 1;
+      this.endlessMode = false;
       this.updateLevelInfo();
-      this.game.startLevel(this.currentLevel);
+      this.game.startLevel(this.currentLevel, false);
+    });
+
+    this.endlessBtn.addEventListener('click', () => {
+      Sound.init();
+      Sound.click();
+      this.currentLevel = 1;
+      this.endlessMode = true;
+      this.updateLevelInfo();
+      this.game.startLevel(this.currentLevel, true);
     });
 
     this.restartBtn.addEventListener('click', () => {
       Sound.click();
       this.updateLevelInfo();
-      this.game.startLevel(this.currentLevel);
+      // 保留当前模式（无尽模式失败后"再来一局"仍是无尽）
+      this.game.startLevel(this.currentLevel, this.endlessMode);
     });
 
     this.checkpointBtn.addEventListener('click', () => {
@@ -99,7 +114,8 @@ class UI {
       Sound.click();
       this.closeLevelSelect();
       this.togglePause();
-      this.game.startLevel(this.currentLevel);
+      // 暂停菜单"重新开始"：保留当前模式
+      this.game.startLevel(this.currentLevel, this.endlessMode);
     });
 
     this.levelSelectBtn.addEventListener('click', () => {
@@ -147,6 +163,24 @@ class UI {
     });
   }
 
+  bindMute() {
+    this.updateMuteBtn();
+    this.muteBtn.addEventListener('click', () => {
+      // 切换静音（Sound.setEnabled 会持久化到 localStorage）
+      Sound.setEnabled(!Sound.isEnabled());
+      this.updateMuteBtn();
+      Sound.click();
+    });
+  }
+
+  updateMuteBtn() {
+    if (!this.muteBtn) return;
+    const muted = !Sound.isEnabled();
+    this.muteBtn.textContent = muted ? '🔇' : '🔊';
+    this.muteBtn.classList.toggle('muted', muted);
+    this.muteBtn.title = muted ? '音效已关（点击开启）' : '音效开启（点击关闭）';
+  }
+
   openLevelSelect() {
     this.pauseOverlay.classList.remove('hidden');
     document.getElementById('pause-menu').classList.add('hidden');
@@ -183,9 +217,10 @@ class UI {
       btn.addEventListener('click', () => {
         Sound.click();
         this.currentLevel = parseInt(id);
+        this.endlessMode = false; // 选关卡 = 普通模式
         this.updateLevelInfo();
         this.closeLevelSelect();
-        this.game.startLevel(this.currentLevel);
+        this.game.startLevel(this.currentLevel, false);
       });
       this.levelGrid.appendChild(btn);
     }
@@ -328,17 +363,27 @@ class UI {
   }
 
   updateWave(info) {
+    if (info.endless || info.total === Infinity) {
+      this.waveTextEl.textContent = `第 ${info.current} 波 · 无尽`;
+      // 无尽模式：进度条不显示"总波数"，改为按 1 分钟窗口展示本波进度
+      this.progressFillEl.style.width = '100%';
+      return;
+    }
     this.waveTextEl.textContent = `第 ${info.current}/${info.total} 波`;
     this.progressFillEl.style.width = `${(info.current / info.total) * 100}%`;
   }
 
   updateLevelInfo() {
     if (this.levelInfoEl) {
-      const level = LEVELS[this.currentLevel];
-      if (level) {
-        this.levelInfoEl.textContent = `当前关卡：${level.name}`;
+      if (this.endlessMode) {
+        this.levelInfoEl.textContent = '模式：♾️ 无尽（无限波次，越打越强）';
       } else {
-        this.levelInfoEl.textContent = '';
+        const level = LEVELS[this.currentLevel];
+        if (level) {
+          this.levelInfoEl.textContent = `当前关卡：${level.name}`;
+        } else {
+          this.levelInfoEl.textContent = '';
+        }
       }
     }
   }

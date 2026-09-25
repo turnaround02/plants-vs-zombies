@@ -302,6 +302,32 @@ body {
   border-color: #e65100;
 }
 
+/* 音效开关按钮 */
+#mute-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(to bottom, #f5e6c8, #d4b483);
+  border: 2px solid #8b5a2b;
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+#mute-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+}
+
+#mute-btn.muted {
+  opacity: 0.6;
+  filter: grayscale(0.6);
+}
+
 #pause-overlay h1 {
   font-size: 36px;
   margin-bottom: 20px;

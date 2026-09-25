@@ -2,8 +2,19 @@
 // 音效模块 - 使用 Web Audio API 生成简单音效
 // ============================================================
 const Sound = (() => {
+  const MUTE_KEY = 'pvz_muted_v1';
   let ctx = null;
   let enabled = true;
+  // 从 localStorage 读取静音偏好（与浏览器版 mute-button 对齐）
+  try {
+    if (localStorage.getItem(MUTE_KEY) === '1') enabled = false;
+  } catch (e) { /* localStorage 不可用时保持默认开启 */ }
+
+  function setEnabled(v) {
+    enabled = v;
+    try { localStorage.setItem(MUTE_KEY, v ? '0' : '1'); } catch (e) {}
+  }
+  function isEnabled() { return enabled; }
 
   function init() {
     if (!ctx) {
@@ -35,8 +46,8 @@ const Sound = (() => {
 
   return {
     init,
-    setEnabled(v) { enabled = v; },
-    isEnabled() { return enabled; },
+    isEnabled,
+    setEnabled,
 
     click() {
       playTone(600, 0.08, 'square', 0.08);
