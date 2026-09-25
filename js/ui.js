@@ -41,6 +41,20 @@ class UI {
     this.shareHintEl = document.getElementById('share-hint');
     this.countdownOverlay = document.getElementById('countdown-overlay');
     this.countdownNumberEl = document.getElementById('countdown-number');
+    this.waveInfoEl = document.getElementById('wave-info');
+    this.scoreInfoEl = document.getElementById('score-info');
+    // 开局选植物面板
+    this.plantPickOverlay = document.getElementById('plant-pick-overlay');
+    this.plantPickGrid = document.getElementById('plant-pick-grid');
+    this.plantPickCount = document.getElementById('plant-pick-count');
+    this.plantPickStartBtn = document.getElementById('plant-pick-start');
+    this.plantPickBackBtn = document.getElementById('plant-pick-back');
+
+    // 开局携带植物（普通/无尽模式上限 MAX_PLANT_CHOICES；沙盒用全部）
+    // 默认预设一套合理搭配，玩家可在选植物面板里改
+    this.chosenPlantIds = this._loadChosenPlants();
+    // 选植物面板打开时记录的是哪个入口（开始/无尽/选关卡），确认后据此 startLevel
+    this._pendingStart = null; // { endless, sandbox, levelId }
 
     // 卡片冷却状态
     this.cardCooldowns = {};
@@ -58,6 +72,7 @@ class UI {
     this.bindShovel();
     this.bindMute();
     this.bindShare();
+    this.bindPlantPicker();
 
     // 初始化卡片
     this.buildPlantCards();
@@ -71,6 +86,10 @@ class UI {
     this.updateScore(game.score, game.kills);
     this.updateLevelInfo();
     this.updateMenuStats();
+
+    // 问题3修复：初始加载时手动套用一次 menu 态，隐藏 HUD 玩法元素与暂停按钮
+    // （构造期不会 emit，否则 #pause-btn 会因 CSS 默认 display 残留在首页）
+    this.applyMenuHudVisibility();
   }
 
   bindEvents() {
@@ -81,7 +100,8 @@ class UI {
       this.endlessMode = false;
       this.sandboxMode = false;
       this.updateLevelInfo();
-      this.game.startLevel(this.currentLevel, false);
+      // 开局先选植物（最多 8 种）→ 确认后进 3-2-1 倒数
+      this.openPlantPicker({ endless: false, sandbox: false, levelId: 1 });
     });
 
     this.endlessBtn.addEventListener('click', () => {
@@ -91,7 +111,7 @@ class UI {
       this.endlessMode = true;
       this.sandboxMode = false;
       this.updateLevelInfo();
-      this.game.startLevel(this.currentLevel, true);
+      this.openPlantPicker({ endless: true, sandbox: false, levelId: 1 });
     });
 
     this.sandboxBtn.addEventListener('click', () => {
@@ -101,7 +121,9 @@ class UI {
       this.endlessMode = false;
       this.sandboxMode = true;
       this.updateLevelInfo();
+      // 沙盒模式豁免选植物（全植物自由），直接进倒数；重建卡片条显示全部 11 种
       this.game.startLevel(this.currentLevel, false, true);
+      this.buildPlantCards();
     });
 
     this.restartBtn.addEventListener('click', () => {
@@ -111,8 +133,9 @@ class UI {
       this.game.isPaused = false;
       this.pauseOverlay.classList.add('hidden');
       this.updateLevelInfo();
-      // 保留当前模式（无尽/沙盒），切换则回到普通
+      // 保留当前模式（无尽/沙盒），切换则回到普通；重开同模式需重建卡片条
       this.game.startLevel(this.currentLevel, this.endlessMode, this.sandboxMode);
+      this.buildPlantCards();
     });
 
     this.checkpointBtn.addEventListener('click', () => {
@@ -138,8 +161,9 @@ class UI {
       Sound.click();
       this.closeLevelSelect();
       this.togglePause();
-      // 暂停菜单"重新开始"：保留当前模式
+      // 暂停菜单"重新开始"：保留当前模式；重开同模式需重建卡片条
       this.game.startLevel(this.currentLevel, this.endlessMode, this.sandboxMode);
+      this.buildPlantCards();
     });
 
     this.levelSelectBtn.addEventListener('click', () => {
@@ -282,6 +306,21 @@ class UI {
     document.getElementById('level-select').classList.add('hidden');
   }
 
+  // 读档：从 localStorage 读取上次选择的开局植物（无则用默认搭配）
+  _loadChosenPlants() {
+    const DEFAULTS = ['sunflower', 'peashooter', 'wallnut', 'snowpea', 'cherrybomb', 'dualPea'];
+    try {
+      const raw = localStorage.getItem('pvz_plant_choices');
+      if (!raw) return DEFAULTS;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return DEFAULTS;
+      const valid = parsed.filter((id) => PLANT_TYPES[id] && typeof id === 'string');
+      return valid.length ? valid : DEFAULTS;
+    } catch (e) {
+      return DEFAULTS;
+    }
+  }
+
   buildLevelGrid() {
     this.levelGrid.innerHTML = '';
     for (let id in LEVELS) {
@@ -316,16 +355,134 @@ class UI {
         this.game.isPaused = false;
         this.closeLevelSelect();
         this.pauseOverlay.classList.add('hidden');
-        this.game.startLevel(this.currentLevel, false);
+        this.openPlantPicker({ endless: false, sandbox: false, levelId: this.currentLevel });
       });
       this.levelGrid.appendChild(btn);
     }
   }
 
+  // 开局携带植物持久化：读 localStorage，缺失/损坏则回落默认预设 8 种
+  _loadChosenPlants() {
+    const DEFAULT = ['sunflower', 'peashooter', 'snowpea', 'wallnut', 'cherrybomb', 'repeater', 'dualPea', 'catTail'];
+    let ids = null;
+    try {
+      const raw = localStorage.getItem('pvz_chosen_plants_v1');
+      if (raw) ids = JSON.parse(raw);
+    } catch (e) {
+      ids = null;
+    }
+    if (!Array.isArray(ids)) return DEFAULT.slice();
+    // 校验：只保留 PLANT_TYPES 中存在的 id，并去重；普通/无尽模式上限 MAX_PLANT_CHOICES
+    const out = [];
+    for (const id of ids) {
+      if (PLANT_TYPES[id] && !out.includes(id)) out.push(id);
+    }
+    return out.slice(0, CONFIG.MAX_PLANT_CHOICES);
+  }
+
+  // 把当前所选植物写回 localStorage
+  _saveChosenPlants() {
+    try {
+      localStorage.setItem('pvz_chosen_plants_v1', JSON.stringify(this.chosenPlantIds));
+    } catch (e) {
+      // localStorage 不可用（隐私模式等）时静默忽略
+    }
+  }
+
+  // 打开开局选植物面板；沙盒模式豁免（全植物），直接确认开打
+  openPlantPicker(pending) {
+    this._pendingStart = pending; // { endless, sandbox, levelId }
+    if (pending && pending.sandbox) {
+      // 沙盒本不会走到这里（sandbox-btn 直接 startLevel），防御性兜底
+      this._commitStart(pending);
+      return;
+    }
+    // 面板打开期间隐藏主菜单，避免叠层
+    this.menuOverlay.classList.add('hidden');
+    this.plantPickOverlay.classList.remove('hidden');
+    this.buildPlantPickGrid();
+    this._refreshPlantPickUi();
+  }
+
+  // 渲染 11 张可勾选植物卡
+  buildPlantPickGrid() {
+    this.plantPickGrid.innerHTML = '';
+    for (const key in PLANT_TYPES) {
+      const type = PLANT_TYPES[key];
+      const card = document.createElement('div');
+      card.className = 'plant-pick-card' + (this.chosenPlantIds.includes(key) ? ' selected' : '');
+      card.dataset.plantId = key;
+      card.innerHTML = `<span class="pp-icon">${type.icon}</span><span class="pp-name">${type.name}</span><span class="pp-cost">${type.cost}</span>`;
+      card.addEventListener('click', () => {
+        Sound.click();
+        const idx = this.chosenPlantIds.indexOf(key);
+        if (idx === -1) {
+          // 未选中：满 8 种时拒绝并短暂提示
+          if (this.chosenPlantIds.length >= CONFIG.MAX_PLANT_CHOICES) {
+            this.plantPickCount.textContent = '已达上限 8 种，先取消一个';
+            this.plantPickCount.style.color = '#f44336';
+            setTimeout(() => { this._refreshPlantPickUi(); }, 1500);
+            return;
+          }
+          this.chosenPlantIds.push(key);
+        } else {
+          this.chosenPlantIds.splice(idx, 1);
+        }
+        card.classList.toggle('selected', this.chosenPlantIds.includes(key));
+        this._refreshPlantPickUi();
+        this._saveChosenPlants();
+      });
+      this.plantPickGrid.appendChild(card);
+    }
+  }
+
+  // 刷新已选计数与开始按钮可用态
+  _refreshPlantPickUi() {
+    this.plantPickCount.textContent = '已选 ' + this.chosenPlantIds.length + ' / ' + CONFIG.MAX_PLANT_CHOICES;
+    // 恢复默认绿色（除非正处于"已达上限"红色提示期间，由 setTimeout 回调再覆盖）
+    this.plantPickCount.style.color = '#8bc34a';
+    this.plantPickStartBtn.disabled = (this.chosenPlantIds.length === 0 || this.chosenPlantIds.length > CONFIG.MAX_PLANT_CHOICES);
+  }
+
+  // 确认所选植物并按 pending 入口开打
+  _commitStart(pending) {
+    this._saveChosenPlants();
+    this.plantPickOverlay.classList.add('hidden');
+    // 若仍停在菜单（如点过"返回"后重开），恢复主菜单可见性
+    if (this.game.state === 'menu') this.menuOverlay.classList.remove('hidden');
+
+    this.currentLevel = pending.levelId;
+    this.endlessMode = !!pending.endless;
+    this.sandboxMode = !!pending.sandbox;
+    this.updateLevelInfo();
+    this.game.startLevel(pending.levelId, !!pending.endless, !!pending.sandbox);
+    // 游戏内卡片条只渲染所选植物（沙盒显示全部）
+    this.buildPlantCards();
+  }
+
+  // 绑定开局选植物面板事件
+  bindPlantPicker() {
+    this.plantPickStartBtn.addEventListener('click', () => {
+      Sound.click();
+      this._commitStart(this._pendingStart);
+    });
+    this.plantPickBackBtn.addEventListener('click', () => {
+      Sound.click();
+      this.plantPickOverlay.classList.add('hidden');
+      if (this.game.state === 'menu') this.menuOverlay.classList.remove('hidden');
+      this._pendingStart = null;
+    });
+  }
+
   buildPlantCards() {
     this.plantCardsEl.innerHTML = '';
-    for (const typeId in PLANT_TYPES) {
+    // 沙盒模式全植物；普通/无尽模式只渲染所选植物
+    const ids = (this.game && this.game.sandboxMode)
+      ? Object.keys(PLANT_TYPES)
+      : this.chosenPlantIds;
+    for (const typeId of ids) {
       const type = PLANT_TYPES[typeId];
+      if (!type) continue; // 防御：id 已被移除时跳过
       const card = document.createElement('div');
       card.className = 'plant-card';
       card.dataset.plantId = typeId;
@@ -363,7 +520,20 @@ class UI {
     return cd.remaining > 0;
   }
 
+  // 供构造期与"返回主页"复用；进入倒数/游玩时由 handleStateChange 恢复显示
+  applyMenuHudVisibility() {
+    const hide = this.game.state === 'menu';
+    this.plantCardsEl.style.display = hide ? 'none' : '';
+    this.shovelBtn.style.display = hide ? 'none' : '';
+    this.waveInfoEl.style.display = hide ? 'none' : '';
+    this.scoreInfoEl.style.display = hide ? 'none' : '';
+    this.pauseBtn.style.display = this.game.state === 'playing' ? '' : 'none';
+  }
+
   handleStateChange(data) {
+    // 问题1&3：首页（menu 态）隐藏玩法 HUD（植物卡片/铲子/波次/得分/暂停按钮）
+    this.applyMenuHudVisibility();
+
     // 更新卡片选中状态
     const cards = this.plantCardsEl.querySelectorAll('.plant-card');
     cards.forEach(card => {
@@ -384,11 +554,20 @@ class UI {
     if (data.state === 'countdown') {
       this.countdownNumberEl.textContent = Math.ceil(this.game.countdown) || 'GO';
     }
-    // 暂停菜单仅在"暂停中且游玩/倒数"时显示；结算/首页时隐藏
-    const pauseHidden = data.state === 'countdown' || data.state === 'win' || data.state === 'lose' || !this.isPaused;
-    this.pauseOverlay.classList.toggle('hidden', pauseHidden);
-    // 问题3修复：☰ 暂停按钮仅在"正在玩"时显示；首页/倒数/结算均隐藏（首次加载由 CSS 默认 display 控制，保持一致）
+
+    // 问题1&3：首页（menu）时隐藏整个 HUD 玩法元素（植物卡片/铲子/波次/得分/暂停按钮），
+    // 仅保留静音按钮；进入倒数/游玩才显示。结算屏也隐藏暂停按钮。
+    const inPlay = data.state === 'playing' || data.state === 'countdown';
+    const hideHudPlay = !inPlay; // menu/win/lose 时隐藏玩法 HUD
+    this.plantCardsEl.style.display = hideHudPlay ? 'none' : '';
+    this.shovelBtn.style.display = hideHudPlay ? 'none' : '';
+    this.waveInfoEl.style.display = hideHudPlay ? 'none' : '';
+    this.scoreInfoEl.style.display = hideHudPlay ? 'none' : '';
     this.pauseBtn.style.display = data.state === 'playing' ? '' : 'none';
+
+    // 暂停菜单仅在"暂停中且游玩"时显示；结算/首页/倒数时隐藏
+    const pauseHidden = data.state !== 'playing' || !this.isPaused;
+    this.pauseOverlay.classList.toggle('hidden', pauseHidden);
 
     if (data.state === 'win') {
       this.pauseBtn.style.display = 'none';

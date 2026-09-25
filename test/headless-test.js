@@ -118,7 +118,8 @@ async function runTests() {
     if (!initState.hasGame) throw new Error('游戏未初始化!');
     if (initState.state !== 'menu') throw new Error(`初始状态应为 menu, 实际为 ${initState.state}`);
     if (!initState.menuVisible) throw new Error('主菜单未显示!');
-    if (initState.plantCards !== 11) throw new Error(`应有 11 张植物卡片, 实际 ${initState.plantCards}`);
+    // 菜单状态下卡片条只渲染所选 8 种植物（buildPlantCards 按 chosenPlantIds 生成）
+    if (initState.plantCards !== 8) throw new Error(`菜单态应有 8 张所选植物卡片, 实际 ${initState.plantCards}`);
     if (initState.canvasSize.w !== 960 || initState.canvasSize.h !== 600) {
       throw new Error(`画布尺寸错误: ${JSON.stringify(initState.canvasSize)}`);
     }
@@ -130,8 +131,10 @@ async function runTests() {
     // 测试 2: 开始游戏
     // ==========================================
     console.log('\n📋 测试 2: 开始游戏');
-    await page.click('#start-btn');
-    await sleep(500);
+    await page.click('#start-btn'); // 现在会先打开开局选植物面板
+    await sleep(200);
+    await page.click('#plant-pick-start'); // 确认所选植物，真正开始
+    await sleep(300);
 
     const playState = await page.evaluate(() => {
       const game = window.__game;
@@ -304,6 +307,14 @@ async function runTests() {
     });
     await sleep(100);
     // 选择并放置坚果墙(便宜且冷却长)
+    // 重开新一局，保证卡片条只含所选 8 种植物
+    await page.evaluate(() => {
+      window.__game.startLevel(1, false, false);
+      window.__game.skipCountdown();
+      window.__game.sun = 200;
+      window.__ui.buildPlantCards();
+    });
+    await sleep(200);
     const cards2 = await page.$$('.plant-card');
     await cards2[3].click(); // 坚果墙
     await sleep(200);
@@ -614,6 +625,8 @@ async function runTests() {
       const progressUnlocked = SaveStore.getProgress().unlockedLevel;
       const allUnlocked = Array.from({ length: totalLevels }, (_, i) => i + 1)
         .every(id => SaveStore.isLevelUnlocked(id));
+      // 还原为默认 8 种携带植物（此前测试可能改动过选择）
+      window.__ui.chosenPlantIds = window.__ui._loadChosenPlants();
       // 重建关卡网格并检查徽章（含星级）
       window.__ui.buildLevelGrid();
       const grid = document.getElementById('level-grid');

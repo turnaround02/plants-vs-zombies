@@ -551,6 +551,112 @@ body {
   animation: countdown-pop 0.5s ease-out;
 }
 
+/* 开局前选植物面板：网格勾选 ≤8 种 */
+#plant-pick-overlay {
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+#plant-pick-overlay h2 {
+  font-size: 22px;
+  color: #ffd700;
+  margin-bottom: 6px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+
+#plant-pick-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 560px;
+  margin-bottom: 14px;
+}
+
+.plant-pick-card {
+  width: 70px;
+  height: 78px;
+  border-radius: 8px;
+  background: linear-gradient(to bottom, #f5e6c8, #d4b483);
+  border: 2px solid #8b5a2b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s, box-shadow 0.1s;
+  user-select: none;
+}
+
+.plant-pick-card .pp-icon { font-size: 26px; line-height: 1; }
+.plant-pick-card .pp-name { font-size: 10px; color: #5d4037; font-weight: bold; margin-top: 2px; }
+.plant-pick-card .pp-cost {
+  position: absolute; bottom: 2px; right: 4px;
+  font-size: 10px; font-weight: bold; color: #2d5a2d;
+  background: rgba(255,255,255,0.7); border-radius: 3px; padding: 0 3px;
+}
+
+.plant-pick-card.selected {
+  border-color: #ffd700;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.7);
+  transform: scale(1.05);
+}
+
+.plant-pick-card.selected::after {
+  content: "✓";
+  position: absolute; top: 1px; right: 3px;
+  color: #2e7d32; font-size: 13px; font-weight: bold;
+}
+
+.plant-pick-card.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.plant-pick-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.plant-pick-actions button {
+  font-size: 16px;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.1s;
+}
+
+.plant-pick-actions button:hover { transform: scale(1.05); }
+
+#plant-pick-back {
+  background: linear-gradient(to bottom, #9e9e9e, #757575);
+  color: #fff;
+}
+
+#plant-pick-start {
+  background: linear-gradient(to bottom, #4caf50, #2e7d32);
+  color: #fff;
+}
+
+#plant-pick-start:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+#plant-pick-count {
+  font-size: 13px;
+  color: #8bc34a;
+  margin-bottom: 8px;
+}
+
+
 @keyframes countdown-pop {
   0% { transform: scale(1.6); opacity: 0; }
   60% { transform: scale(1); opacity: 1; }

@@ -6,6 +6,9 @@ const CONFIG = {
   CANVAS_WIDTH: 960,
   CANVAS_HEIGHT: 600,
 
+  // 开局选植物：每关开始前玩家最多可携带的植物数（普通/无尽模式）
+  MAX_PLANT_CHOICES: 8,
+
   // 网格布局: 5行 x 9列
   ROWS: 5,
   COLS: 9,
