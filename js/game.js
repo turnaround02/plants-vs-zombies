@@ -6,7 +6,8 @@ class Game {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.state = 'menu'; // menu | playing | win | lose
+    this.state = 'menu'; // menu | countdown | playing | win | lose
+    this.countdown = 0;  // 开局倒数剩余秒数（state==='countdown' 时递减）
     this.isPaused = false; // 暂停标志（由UI管理，与state独立）
 
     // 资源
@@ -87,10 +88,21 @@ class Game {
     this.levelManager = new LevelManager(levelId, endless || sandbox);
     this.levelManager.start(this);
 
-    this.state = 'playing';
+    // 开局前 3-2-1 倒数（期间游戏冻结，UI 显示大数字；倒数结束进 playing）
+    this.isPaused = false;
+    this.state = 'countdown';
+    this.countdown = 3;
     this.emitStateChange();
     this.emitSunChange();
     this.emitWaveChange();
+  }
+
+  // 跳过开局倒数（自动化测试用：让游戏立即进入 playing 态）
+  skipCountdown() {
+    if (this.state !== 'countdown') return;
+    this.countdown = 0;
+    this.state = 'playing';
+    this.emitStateChange();
   }
 
   reset() {
@@ -132,6 +144,17 @@ class Game {
   // ==========================================================
 
   update(dt) {
+    // 开局倒数：3-2-1 递减，期间游戏冻结（不计时、不刷僵尸、不掉阳光），
+    // 倒数归零后进入 playing 并发出状态变化（UI 据此显示"开始"并放行）
+    if (this.state === 'countdown') {
+      this.countdown -= dt / 1000;
+      if (this.countdown <= 0) {
+        this.countdown = 0;
+        this.state = 'playing';
+        this.emitStateChange();
+      }
+      return;
+    }
     if (this.state !== 'playing') return;
     if (this.isPaused) return;
 

@@ -135,6 +135,7 @@ async function runTests() {
 
     const playState = await page.evaluate(() => {
       const game = window.__game;
+      game.skipCountdown(); // 跳过开局倒数（3秒），立即进入 playing
       return {
         state: game.state,
         sun: game.sun,
@@ -358,6 +359,7 @@ async function runTests() {
     await sleep(300);
     const restartState = await page.evaluate(() => {
       const game = window.__game;
+      game.skipCountdown(); // 跳过开局倒数
       return { state: game.state, sun: game.sun };
     });
     console.log('  重新开始状态:', JSON.stringify(restartState));
@@ -383,6 +385,7 @@ async function runTests() {
       const mower = game.mowers[row];
       const remainingRowZombies = game.zombies.filter(z => z.row === row && !z.dead).length;
       // 3. 割草机触发后应清整行且保持 playing 状态
+      game.skipCountdown(); // 跳过开局倒数，使状态断言在 playing 下进行
       return { ok: mower.spent === true && remainingRowZombies === 0 && game.state === 'playing', remainingRowZombies, state: game.state };
     });
     console.log('  割草机状态:', JSON.stringify(mowerState));
@@ -394,6 +397,7 @@ async function runTests() {
     const mowerNoLose = await page.evaluate(() => {
       const game = window.__game;
       game.startLevel(1);
+      game.skipCountdown(); // 跳过开局倒数
       game.zombies = [];
       game.spawnZombie('normal', 1); game.zombies[0].x = 55; // 越过触发线 80 但 > HOUSE_X 60
       game.mowers[1].spent = false;
@@ -475,6 +479,7 @@ async function runTests() {
       }
       // 2. 进入第9关，开局阳光应为 150
       game.startLevel(9);
+      game.skipCountdown(); // 跳过开局倒数
       if (game.sun !== 150) {
         return { ok: false, reason: `第9关开局阳光应为150, 实际 ${game.sun}` };
       }
@@ -543,6 +548,7 @@ async function runTests() {
     await sleep(200);
     await page.evaluate(() => {
       window.__game.startLevel(1);
+      window.__game.skipCountdown(); // 跳过开局倒数
       window.__game.sun = 200;
       window.__ui.selectPlant('wallnut'); // 选坚果墙
     });
@@ -577,11 +583,13 @@ async function runTests() {
     await page.evaluate(() => {
       const g = window.__game;
       g.startLevel(1);
+      g.skipCountdown(); // 跳过开局倒数
       g.sun = 200;
     });
     await sleep(200);
     await page.evaluate(() => {
       const g = window.__game;
+      g.skipCountdown(); // 跳过开局倒数，确保 playing 状态下放置
       g.selectedPlant = PLANT_TYPES.wallnut;
       g.placePlant('wallnut', 0, 0);
     });
@@ -682,6 +690,7 @@ async function runTests() {
     const moonResult = await page.evaluate(() => {
       const g = window.__game;
       g.startLevel(9); // 夜间关
+      g.skipCountdown(); // 跳过开局倒数
       g.suns = [];
       g.sunFallTimer = 0;
       // 推进到掉月亮
@@ -736,6 +745,7 @@ async function runTests() {
       window.__ui.updateLevelInfo();
       const lvlText = document.getElementById('level-info').textContent;
       window.__ui.game.startLevel(1, true);
+      window.__ui.game.skipCountdown(); // 跳过开局倒数
       const stateAfter = window.__ui.game.state;
       return { lvlText, stateAfter, hasBtn: !!document.getElementById('endless-btn') };
     });
@@ -794,6 +804,7 @@ async function runTests() {
       const g = window.__game;
       // 1. 启动沙盒
       g.startLevel(1, false, true);
+      g.skipCountdown(); // 跳过开局倒数
       if (!g.sandboxMode) return { ok: false, reason: 'sandboxMode 未置位' };
       // 2. 阳光应为 MAX_SAFE_INTEGER
       if (g.sun !== Number.MAX_SAFE_INTEGER) return { ok: false, reason: `沙盒阳光应为 MAX_SAFE_INTEGER, 实际 ${g.sun}` };
@@ -871,6 +882,52 @@ async function runTests() {
     if (!shareResult.emptyImportRejected) throw new Error('空串应被拒绝');
     // 清档还原
     await page.evaluate(() => localStorage.removeItem('pvz_save_v1'));
+
+    // ==========================================
+    // 测试 23: 开局倒数（3 秒 countdown → playing）
+    // ==========================================
+    console.log('\n📋 测试 23: 开局倒数');
+    const countdownResult = await page.evaluate(async () => {
+      const game = window.__game;
+      const overlay = document.getElementById('countdown-overlay');
+      const number = document.getElementById('countdown-number');
+      // 1. 启动关卡后应处于 countdown 态且剩余约 3 秒
+      game.startLevel(1, false, false);
+      const stateAfterStart = game.state;
+      if (stateAfterStart !== 'countdown') return { ok: false, reason: `启动后应为 countdown, 实际 ${stateAfterStart}` };
+      if (game.countdown < 2.9 || game.countdown > 3) {
+        return { ok: false, reason: `开局倒数剩余应约为 3, 实际 ${game.countdown}` };
+      }
+      // 2. 倒数覆盖层应可见且数字可见
+      if (overlay.classList.contains('hidden')) return { ok: false, reason: 'countdown-overlay 未显示' };
+      const rect = number.getBoundingClientRect();
+      const numberVisible = rect.width > 0 && rect.height > 0;
+      if (!numberVisible) return { ok: false, reason: 'countdown-number 不可见' };
+      // 3. 推进 3 秒后应自动过渡到 playing
+      game.update(3000);
+      if (game.state !== 'playing') return { ok: false, reason: `倒数结束后应为 playing, 实际 ${game.state}` };
+      if (game.countdown !== 0) return { ok: false, reason: `倒数结束后 countdown 应为 0, 实际 ${game.countdown}` };
+      // 4. playing 态下覆盖层应隐藏
+      if (!overlay.classList.contains('hidden')) return { ok: false, reason: 'playing 态下 countdown-overlay 仍显示' };
+      // 5. skipCountdown 幂等：playing 态下调用应无副作用
+      game.skipCountdown();
+      if (game.state !== 'playing') return { ok: false, reason: 'playing 态下 skipCountdown 不应改变状态' };
+      return {
+        ok: true,
+        startCountdown: stateAfterStart,
+        startRemaining: 3,
+        afterUpdate: game.state,
+        numberVisible,
+      };
+    });
+    console.log('  开局倒数:', JSON.stringify(countdownResult));
+    if (!countdownResult.ok) throw new Error(`开局倒数异常: ${countdownResult.reason || JSON.stringify(countdownResult)}`);
+    // 还原为普通开局状态
+    await page.evaluate(() => {
+      const g = window.__game;
+      g.startLevel(1, false, false);
+      g.skipCountdown();
+    });
 
     await page.screenshot({ path: path.join(SHOT_DIR, '14-mobile-scaled.png') });
     console.log('  ✅ 移动端缩放截图已保存: test/screenshots/14-mobile-scaled.png');
