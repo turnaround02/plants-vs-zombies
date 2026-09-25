@@ -39,9 +39,8 @@ class UI {
     this.copySaveBtn = document.getElementById('copy-save-btn');
     this.importSaveBtn = document.getElementById('import-save-btn');
     this.shareHintEl = document.getElementById('share-hint');
-    this.copySaveBtn = document.getElementById('copy-save-btn');
-    this.importSaveBtn = document.getElementById('import-save-btn');
-    this.shareHintEl = document.getElementById('share-hint');
+    this.countdownOverlay = document.getElementById('countdown-overlay');
+    this.countdownNumberEl = document.getElementById('countdown-number');
 
     // 卡片冷却状态
     this.cardCooldowns = {};
@@ -107,6 +106,10 @@ class UI {
 
     this.restartBtn.addEventListener('click', () => {
       Sound.click();
+      // 防御：确保不残留暂停态（避免 handleStateChange 重新顶出暂停菜单）
+      this.isPaused = false;
+      this.game.isPaused = false;
+      this.pauseOverlay.classList.add('hidden');
       this.updateLevelInfo();
       // 保留当前模式（无尽/沙盒），切换则回到普通
       this.game.startLevel(this.currentLevel, this.endlessMode, this.sandboxMode);
@@ -306,7 +309,13 @@ class UI {
         this.endlessMode = false; // 选关卡 = 普通模式
         this.sandboxMode = false;
         this.updateLevelInfo();
+        // 问题5修复：选关卡 = 退出暂停菜单 + 重开该关（含 3-2-1 倒数）
+        // 必须清 isPaused 并隐藏暂停菜单，否则 startLevel 后 handleStateChange
+        // 因 isPaused 仍为 true 会把暂停菜单重新顶出来（停在暂停页）
+        this.isPaused = false;
+        this.game.isPaused = false;
         this.closeLevelSelect();
+        this.pauseOverlay.classList.add('hidden');
         this.game.startLevel(this.currentLevel, false);
       });
       this.levelGrid.appendChild(btn);
@@ -370,7 +379,15 @@ class UI {
     // 更新覆盖层
     this.menuOverlay.classList.toggle('hidden', data.state !== 'menu');
     this.resultOverlay.classList.toggle('hidden', data.state !== 'win' && data.state !== 'lose');
-    this.pauseOverlay.classList.toggle('hidden', !this.isPaused);
+    // 开局倒数：显示大号 3-2-1 数字（数字本身在 ui.update 中逐帧刷新）
+    this.countdownOverlay.classList.toggle('hidden', data.state !== 'countdown');
+    if (data.state === 'countdown') {
+      this.countdownNumberEl.textContent = Math.ceil(this.game.countdown) || 'GO';
+    }
+    // 暂停菜单仅在"暂停中且游玩/倒数"时显示；结算/首页时隐藏
+    const pauseHidden = data.state === 'countdown' || data.state === 'win' || data.state === 'lose' || !this.isPaused;
+    this.pauseOverlay.classList.toggle('hidden', pauseHidden);
+    // 问题3修复：☰ 暂停按钮仅在"正在玩"时显示；首页/倒数/结算均隐藏（首次加载由 CSS 默认 display 控制，保持一致）
     this.pauseBtn.style.display = data.state === 'playing' ? '' : 'none';
 
     if (data.state === 'win') {
@@ -507,6 +524,12 @@ class UI {
   }
 
   update(dt) {
+    // 开局倒数数字逐帧刷新（3 → 2 → 1；game.update 在 countdown 态负责递减 game.countdown）
+    if (this.game.state === 'countdown' && this.countdownNumberEl) {
+      const n = Math.ceil(this.game.countdown);
+      this.countdownNumberEl.textContent = n > 0 ? String(n) : 'GO!';
+    }
+
     // 更新卡片冷却
     let changed = false;
     for (const typeId in this.cardCooldowns) {

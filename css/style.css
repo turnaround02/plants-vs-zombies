@@ -190,7 +190,12 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* 内容过多时顶部对齐 + 纵向滚动兜底，避免标题上移遮挡植物卡片、底部文字被裁
+     （历史：#menu-overlay 加了无尽/沙盒按钮后内容 ~650px > 600px 可用高度，
+       原 justify-content:center 使内容同时向上下溢出被 #game-container overflow:hidden 裁剪） */
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: 12px 0;
   z-index: 20;
   color: #fff;
   text-align: center;
@@ -201,22 +206,23 @@ body {
 }
 
 .overlay h1 {
-  font-size: 48px;
-  margin-bottom: 10px;
+  /* 主菜单 h1 压缩字号，与多个模式按钮/帮助文字共存于 600px 内 */
+  font-size: 32px;
+  margin-bottom: 8px;
   text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
   color: #ffd700;
 }
 
 .overlay p {
-  font-size: 18px;
-  margin-bottom: 20px;
+  font-size: 16px;
+  margin-bottom: 10px;
   max-width: 500px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .overlay button {
-  font-size: 22px;
-  padding: 14px 48px;
+  font-size: 18px;
+  padding: 10px 36px;
   border: none;
   border-radius: 30px;
   background: linear-gradient(to bottom, #4caf50, #2e7d32);
@@ -225,20 +231,38 @@ body {
   font-weight: bold;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: transform 0.1s, box-shadow 0.1s;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
-.overlay button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+/* 主菜单：模式按钮（无尽/沙盒）并排，节省纵向空间 */
+#menu-overlay .menu-mode-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#menu-overlay .menu-mode-row button {
+  margin-bottom: 0;
+  flex: 0 1 auto;
 }
 
 #help-text {
   background: rgba(0, 0, 0, 0.4);
   border-radius: 10px;
-  padding: 15px 25px;
-  font-size: 15px;
-  line-height: 2;
+  padding: 10px 18px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+#help-text p {
+  margin-bottom: 2px;
+  font-size: 13px;
+}
+
+
+.overlay button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
 #result-title.win {
@@ -510,3 +534,26 @@ body {
 }
 
 #share-hint.hidden { display: none; }
+
+/* 开局 3-2-1 倒数：大号中央数字，pointer-events:none 不影响底层画布交互 */
+#countdown-overlay {
+  background: transparent;
+  pointer-events: none;
+  justify-content: center;
+}
+
+#countdown-number {
+  font-size: 140px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 4px 4px 12px rgba(0, 0, 0, 0.9);
+  line-height: 1;
+  animation: countdown-pop 0.5s ease-out;
+}
+
+@keyframes countdown-pop {
+  0% { transform: scale(1.6); opacity: 0; }
+  60% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
