@@ -22,6 +22,9 @@ var hud_wave_progress: ProgressBar
 var score: int = 0
 var kills: int = 0
 var last_bonus: int = 0
+# 本局星级与割草机用量（用于结算屏展示，与浏览器版 lastStars/lastMowersUsed 对齐）
+var last_stars: int = 0
+var last_mowers_used: int = 0
 
 # 存档路径（Godot 用户目录）
 const SAVE_PATH := "user://save.cfg"
@@ -165,22 +168,29 @@ func _process(delta: float) -> void:
 	# 卡片冷却推进（毫秒）；暂停时提前 return，冷却自然冻结（与浏览器一致）
 	if plant_bar and plant_bar.has_method("update_cooldowns"):
 		plant_bar.update_cooldowns(delta * 1000.0)
-	# 夜间关卡：天空不掉阳光（与浏览器版 isNightLevel 逻辑对齐）
-	if not current_level.get("night", false):
-		sun_fall_timer += delta
-		if sun_fall_timer >= sun_fall_interval:
-			sun_fall_timer = 0.0
-			spawn_sun_from_sky()
+	# 夜间关卡：天空掉月亮（🌙，与浏览器版对齐，收集 +sun_fall_amount）；白天掉太阳
+	sun_fall_timer += delta
+	if sun_fall_timer >= sun_fall_interval:
+		sun_fall_timer = 0.0
+		var is_night: bool = current_level.get("night", false)
+		spawn_sky_pickup(is_night)
 	_update_wave(delta)
 
-func spawn_sun_from_sky() -> void:
+## 天空收集物：夜间为月亮（is_moon=true，蓝色弯月），白天为太阳；收集效果相同
+func spawn_sky_pickup(is_night: bool) -> void:
 	var x: float = randf() * VIEWPORT_WIDTH
-	var sun_instance: Node2D = preload("res://scenes/Sun.tscn").instantiate()
-	sun_instance.process_mode = Node.PROCESS_MODE_PAUSABLE
-	sun_instance.position = Vector2(x, -20)
-	sun_instance.sun_amount = sun_fall_amount
-	add_child(sun_instance)
-	sun_instance.add_to_group("suns")
+	var instance: Node2D = preload("res://scenes/Sun.tscn").instantiate()
+	instance.process_mode = Node.PROCESS_MODE_PAUSABLE
+	instance.position = Vector2(x, -20)
+	instance.sun_amount = sun_fall_amount
+	if is_night:
+		# is_moon 是 @export 变量，实例化后属性可写
+		instance.is_moon = true
+	add_child(instance)
+	instance.add_to_group("suns")
+
+func spawn_sun_from_sky() -> void:
+	spawn_sky_pickup(false)
 
 ## 向日葵等产光植物在自身位置生成可见阳光（短下落 + 可点击收集）
 func spawn_sun_at(pos: Vector2, amount: int) -> void:
@@ -351,9 +361,18 @@ func _update_pause_overlay() -> void:
 func _show_result_screen() -> void:
 	var result := Label.new()
 	result.name = "ResultLabel"
-	result.text = "第 " + str(current_level_id) + " 关完成！\n本关得分: " + str(score) + "\n奖励: " + str(last_bonus)
-	result.position = Vector2(280, 200)
-	result.size = Vector2(400, 150)
+	# 本局星级 + 割草机数 + 历史最佳（与浏览器版胜利屏信息对齐）
+	var stars_str := _stars_display(last_stars)
+	var best := get_best_for_level(current_level_id)
+	var lines := [
+		"第 " + str(current_level_id) + " 关完成！",
+		"本局 " + stars_str + "（割草机 " + str(last_mowers_used) + " 台）",
+		"得分: " + str(score) + "  奖励: " + str(last_bonus),
+		"历史最佳 " + str(best.get("score", 0)) + " 分",
+	]
+	result.text = "\n".join(lines)
+	result.position = Vector2(280, 180)
+	result.size = Vector2(400, 180)
 	result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(result)
 	var btn_next := Button.new()
@@ -373,6 +392,13 @@ func _on_result_button() -> void:
 		_start_level(current_level_id + 1)
 	else:
 		_back_to_menu()
+
+## 星级显示（0-3 星），与浏览器版 '★'.repeat + '☆'.repeat 对齐
+func _stars_display(n: int) -> String:
+	var s := ""
+	for i in 3:
+		s += "★" if i < n else "☆"
+	return s
 
 func _clear_result_screen() -> void:
 	for n in ["ResultLabel", "NextLevelButton"]:
@@ -516,6 +542,11 @@ func _on_level_won() -> void:
 	# 过关奖励：基础500 + 剩余阳光折算（与浏览器版 Task 6 对齐）
 	last_bonus = 500 + sun / 10
 	score += last_bonus
+	# 星级：按割草机使用量（0-1台→3星，2-3台→2星，4台及以上→1星，与浏览器版一致）
+	var mowers_used: int = 5 - mowers_available.filter(func(v): return v).size()
+	var stars: int = 3 if mowers_used <= 1 else (2 if mowers_used <= 3 else 1)
+	last_stars = stars
+	last_mowers_used = mowers_used
 	_update_score_display()
 	_save_progress()
 	# 更新 HUD 并停止后续波次
@@ -819,39 +850,79 @@ func _update_score_display() -> void:
 	if hud_score_label:
 		hud_score_label.text = "Score: " + str(score)
 
-## 存档到 user://save.cfg
+## 存档到 user://save.cfg（字段与浏览器版 SaveStore 对齐：
+## unlocked_level / total_score / total_kills / wins / best_scores{level:{score,stars}}）
 func _save_progress() -> void:
+	# 读取已有存档
+	var old_total_score := 0
+	var old_total_kills := 0
+	var old_wins := 0
+	var old_unlocked := 1
+	var old_best_scores := {}
+	if FileAccess.file_exists(SAVE_PATH):
+		var old_file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+		if old_file:
+			var old_data = JSON.parse_string(old_file.get_as_text())
+			old_file.close()
+			if old_data:
+				old_total_score = int(old_data.get("total_score", 0))
+				old_total_kills = int(old_data.get("total_kills", 0))
+				old_wins = int(old_data.get("wins", 0))
+				old_unlocked = int(old_data.get("unlocked_level", 1))
+				var bs = old_data.get("best_scores", {})
+				if bs is Dictionary:
+					old_best_scores = bs
+	# 更新/写入本关最佳（score 与 stars 均取历史最大值，与浏览器 addClearScore 一致）
+	var prev = old_best_scores.get(current_level_id, {})
+	if not (prev is Dictionary):
+		prev = {}
+	var prev_score: int = int(prev.get("score", 0))
+	var prev_stars: int = int(prev.get("stars", 0))
+	var new_best := {
+		"score": maxi(prev_score, score),
+		"stars": maxi(prev_stars, last_stars),
+	}
+	old_best_scores[current_level_id] = new_best
+
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
-		# 读取已有存档并累加
-		var total_score := 0
-		var wins := 0
-		var unlocked := 1
-		if FileAccess.file_exists(SAVE_PATH):
-			var old_file := FileAccess.open(SAVE_PATH, FileAccess.READ)
-			if old_file:
-				var old_data = JSON.parse_string(old_file.get_as_text())
-				old_file.close()
-				if old_data:
-					total_score = int(old_data.get("total_score", 0))
-					wins = int(old_data.get("wins", 0))
-					unlocked = int(old_data.get("unlocked_level", 1))
 		var data := {
-			"unlocked_level": max(unlocked, current_level_id + 1),
-			"total_score": total_score + score,
-			"wins": wins + 1,
+			"unlocked_level": max(old_unlocked, current_level_id + 1),
+			"total_score": old_total_score + score,
+			"total_kills": old_total_kills + kills,
+			"wins": old_wins + 1,
+			"best_scores": old_best_scores,
 		}
 		file.store_string(JSON.stringify(data))
 		file.close()
 
 ## 加载存档
 func _load_progress() -> Dictionary:
+	var default := {
+		"unlocked_level": 1, "total_score": 0, "total_kills": 0,
+		"wins": 0, "best_scores": {},
+	}
 	if not FileAccess.file_exists(SAVE_PATH):
-		return {"unlocked_level": 1, "total_score": 0, "wins": 0}
+		return default
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if file:
 		var data = JSON.parse_string(file.get_as_text())
 		file.close()
-		if data:
+		if data is Dictionary:
+			# 补齐缺失字段，保证结构与浏览器版一致
+			data["unlocked_level"] = int(data.get("unlocked_level", 1))
+			data["total_score"] = int(data.get("total_score", 0))
+			data["total_kills"] = int(data.get("total_kills", 0))
+			data["wins"] = int(data.get("wins", 0))
+			data["best_scores"] = data.get("best_scores", {})
 			return data
-	return {"unlocked_level": 1, "total_score": 0, "wins": 0}
+	return default
+
+## 读取某关的最佳记录 {score, stars}；未通关返回 {score:0, stars:0}
+func get_best_for_level(level_id: int) -> Dictionary:
+	var save := _load_progress()
+	var bs = save.get("best_scores", {})
+	var entry = bs.get(level_id, {})
+	if entry is Dictionary:
+		return {"score": int(entry.get("score", 0)), "stars": int(entry.get("stars", 0))}
+	return {"score": 0, "stars": 0}
