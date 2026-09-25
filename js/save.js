@@ -110,5 +110,51 @@ const SaveStore = (() => {
     }
   }
 
-  return { load, getProgress, bestScore, bestStars, addClearScore, recordWin, recordKill, isLevelUnlocked, saveCheckpoint, loadCheckpoint, clearCheckpoint };
+  // ==========================================================
+  // 存档分享：导出/导入为 base64 字符串（可复制到剪贴板分享）
+  // ==========================================================
+
+  // 导出当前存档为 btoa(unescape(encodeURIComponent(JSON))) 字符串；
+  // 用 encodeURIComponent 包裹以正确编码中文（如关卡名/未来扩展字段）
+  function exportSave() {
+    const s = load() || {
+      unlockedLevel: Object.keys(LEVELS).length,
+      totalScore: 0, totalKills: 0, wins: 0, bestScores: {},
+    };
+    return btoa(unescape(encodeURIComponent(JSON.stringify(s))));
+  }
+
+  // 从分享字符串导入存档；返回 { ok, error }。校验必要字段类型，避免脏数据写坏存档。
+  function importSave(str) {
+    if (typeof str !== 'string' || str.trim() === '') {
+      return { ok: false, error: 'empty' };
+    }
+    let raw;
+    try {
+      raw = decodeURIComponent(escape(atob(str.trim())));
+    } catch (e) {
+      return { ok: false, error: 'decode' };
+    }
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      return { ok: false, error: 'parse' };
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { ok: false, error: 'shape' };
+    }
+    const cleaned = {
+      unlockedLevel: Object.keys(LEVELS).length,
+      totalScore: Number(data.totalScore) || 0,
+      totalKills: Number(data.totalKills) || 0,
+      wins: Number(data.wins) || 0,
+      bestScores: (data.bestScores && typeof data.bestScores === 'object') ? data.bestScores : {},
+      checkpoints: (data.checkpoints && typeof data.checkpoints === 'object') ? data.checkpoints : {},
+    };
+    localStorage.setItem(KEY, JSON.stringify(cleaned));
+    return { ok: true };
+  }
+
+  return { load, getProgress, bestScore, bestStars, addClearScore, recordWin, recordKill, isLevelUnlocked, saveCheckpoint, loadCheckpoint, clearCheckpoint, exportSave, importSave };
 })();

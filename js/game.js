@@ -57,9 +57,10 @@ class Game {
   // 生命周期
   // ==========================================================
 
-  startLevel(levelId, endless = false) {
+  startLevel(levelId, endless = false, sandbox = false) {
     const level = LEVELS[levelId];
-    this.sun = level.startSun;
+    // 沙盒模式：无限阳光（用一个很大的数近似，避免 Infinity 在 UI 显示为 Inf）
+    this.sun = sandbox ? Number.MAX_SAFE_INTEGER : level.startSun;
     this.plants = [];
     this.zombies = [];
     this.projectiles = [];
@@ -77,11 +78,13 @@ class Game {
     this.score = 0;
     this.kills = 0;
     this.endlessMode = !!endless;
+    this.sandboxMode = !!sandbox;
     this.lastStars = 0;
     this.lastMowersUsed = 0;
     this.lastBonus = 0;
 
-    this.levelManager = new LevelManager(levelId, endless);
+    // 沙盒模式：用无尽波次（僵尸无限刷）但跳过失败条件与结算
+    this.levelManager = new LevelManager(levelId, endless || sandbox);
     this.levelManager.start(this);
 
     this.state = 'playing';
@@ -723,7 +726,10 @@ class Game {
     if (this.sun < type.cost) return false;
     if (this.grid[row][col] !== null) return false;
 
-    this.sun -= type.cost;
+    // 沙盒模式：植物免费（不扣阳光，保持 MAX 不变）
+    if (!this.sandboxMode) {
+      this.sun -= type.cost;
+    }
     const plant = new Plant(typeId, row, col);
     this.plants.push(plant);
     this.grid[row][col] = plant;
@@ -875,6 +881,8 @@ class Game {
 
   zombieReachedHouse(zombie) {
     zombie.alive = false;
+    // 沙盒模式：不设失败条件（僵尸到达房屋仅清除该僵尸，不触发 lose）
+    if (this.sandboxMode) return;
     this.state = 'lose';
     Sound.lose();
     this.emitStateChange();

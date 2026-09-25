@@ -7,6 +7,7 @@ class UI {
     this.game = game;
     this.currentLevel = 1;
     this.endlessMode = false; // 无尽模式标志
+    this.sandboxMode = false; // 沙盒模式标志（无限阳光、全植物、不失败）
     this.totalLevels = Object.keys(LEVELS).length;
     this.isPaused = false;
 
@@ -22,6 +23,7 @@ class UI {
     this.resultText = document.getElementById('result-text');
     this.startBtn = document.getElementById('start-btn');
     this.endlessBtn = document.getElementById('endless-btn');
+    this.sandboxBtn = document.getElementById('sandbox-btn');
     this.restartBtn = document.getElementById('restart-btn');
     this.checkpointBtn = document.getElementById('checkpoint-btn');
     this.pauseBtn = document.getElementById('pause-btn');
@@ -34,6 +36,12 @@ class UI {
     this.backBtn = document.getElementById('back-btn');
     this.shovelBtn = document.getElementById('shovel-btn');
     this.muteBtn = document.getElementById('mute-btn');
+    this.copySaveBtn = document.getElementById('copy-save-btn');
+    this.importSaveBtn = document.getElementById('import-save-btn');
+    this.shareHintEl = document.getElementById('share-hint');
+    this.copySaveBtn = document.getElementById('copy-save-btn');
+    this.importSaveBtn = document.getElementById('import-save-btn');
+    this.shareHintEl = document.getElementById('share-hint');
 
     // 卡片冷却状态
     this.cardCooldowns = {};
@@ -50,6 +58,7 @@ class UI {
     this.bindEvents();
     this.bindShovel();
     this.bindMute();
+    this.bindShare();
 
     // 初始化卡片
     this.buildPlantCards();
@@ -71,6 +80,7 @@ class UI {
       Sound.click();
       this.currentLevel = 1;
       this.endlessMode = false;
+      this.sandboxMode = false;
       this.updateLevelInfo();
       this.game.startLevel(this.currentLevel, false);
     });
@@ -80,15 +90,26 @@ class UI {
       Sound.click();
       this.currentLevel = 1;
       this.endlessMode = true;
+      this.sandboxMode = false;
       this.updateLevelInfo();
       this.game.startLevel(this.currentLevel, true);
+    });
+
+    this.sandboxBtn.addEventListener('click', () => {
+      Sound.init();
+      Sound.click();
+      this.currentLevel = 1;
+      this.endlessMode = false;
+      this.sandboxMode = true;
+      this.updateLevelInfo();
+      this.game.startLevel(this.currentLevel, false, true);
     });
 
     this.restartBtn.addEventListener('click', () => {
       Sound.click();
       this.updateLevelInfo();
-      // 保留当前模式（无尽模式失败后"再来一局"仍是无尽）
-      this.game.startLevel(this.currentLevel, this.endlessMode);
+      // 保留当前模式（无尽/沙盒），切换则回到普通
+      this.game.startLevel(this.currentLevel, this.endlessMode, this.sandboxMode);
     });
 
     this.checkpointBtn.addEventListener('click', () => {
@@ -115,7 +136,7 @@ class UI {
       this.closeLevelSelect();
       this.togglePause();
       // 暂停菜单"重新开始"：保留当前模式
-      this.game.startLevel(this.currentLevel, this.endlessMode);
+      this.game.startLevel(this.currentLevel, this.endlessMode, this.sandboxMode);
     });
 
     this.levelSelectBtn.addEventListener('click', () => {
@@ -128,6 +149,8 @@ class UI {
       this.closeLevelSelect();
       this.togglePause();
       this.currentLevel = 1;
+      this.endlessMode = false;
+      this.sandboxMode = false;
       this.game.state = 'menu';
       this.game.emitStateChange();
       this.updateLevelInfo();
@@ -171,6 +194,69 @@ class UI {
       this.updateMuteBtn();
       Sound.click();
     });
+  }
+
+  bindShare() {
+    if (!this.copySaveBtn || !this.importSaveBtn) return;
+    this.copySaveBtn.addEventListener('click', () => this.copySave());
+    this.importSaveBtn.addEventListener('click', () => this.importSave());
+  }
+
+  // 复制存档串：优先 navigator.clipboard，失败则回退到 textarea + execCommand
+  async copySave() {
+    Sound.click();
+    const str = SaveStore.exportSave();
+    const hint = (msg, isError) => {
+      if (this.shareHintEl) {
+        this.shareHintEl.textContent = msg;
+        this.shareHintEl.className = isError ? 'error' : '';
+        this.shareHintEl.classList.remove('hidden');
+      }
+    };
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(str);
+      copied = true;
+    } catch (e) {
+      // 回退方案：http/iframe 下 clipboard API 可能受限
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = str;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e2) {
+        copied = false;
+      }
+    }
+    if (copied) {
+      hint('✅ 存档已复制到剪贴板（粘贴分享给朋友）');
+    } else {
+      hint('📋 复制失败，请手动复制下方存档串：\n' + str, true);
+    }
+  }
+
+  importSave() {
+    Sound.click();
+    const str = window.prompt('粘贴存档串：', '');
+    if (str === null) return; // 用户取消
+    const res = SaveStore.importSave(str);
+    const hint = (msg, isError) => {
+      if (this.shareHintEl) {
+        this.shareHintEl.textContent = msg;
+        this.shareHintEl.className = isError ? 'error' : '';
+        this.shareHintEl.classList.remove('hidden');
+      }
+    };
+    if (res.ok) {
+      hint('✅ 存档导入成功');
+      this.updateMenuStats(); // 刷新主页统计（若可见）
+    } else {
+      hint('❌ 导入失败：存档串格式无效（' + res.error + '）', true);
+    }
   }
 
   updateMuteBtn() {
@@ -218,6 +304,7 @@ class UI {
         Sound.click();
         this.currentLevel = parseInt(id);
         this.endlessMode = false; // 选关卡 = 普通模式
+        this.sandboxMode = false;
         this.updateLevelInfo();
         this.closeLevelSelect();
         this.game.startLevel(this.currentLevel, false);
@@ -246,8 +333,9 @@ class UI {
   selectPlant(typeId) {
     const type = PLANT_TYPES[typeId];
     if (this.game.state !== 'playing') return;
+    // 沙盒模式：植物免费且无冷却（sun 为 MAX_SAFE_INTEGER，cost 检查恒通过；跳过冷却）
     if (this.game.sun < type.cost) return;
-    if (this.isOnCooldown(typeId)) return;
+    if (!this.game.sandboxMode && this.isOnCooldown(typeId)) return;
 
     Sound.click();
     if (this.game.selectedPlant && this.game.selectedPlant.id === typeId) {
@@ -260,6 +348,7 @@ class UI {
   }
 
   isOnCooldown(typeId) {
+    if (this.game.sandboxMode) return false; // 沙盒模式无冷却
     const cd = this.cardCooldowns[typeId];
     if (!cd) return false;
     return cd.remaining > 0;
@@ -346,14 +435,19 @@ class UI {
   }
 
   updateSun(sun) {
-    this.sunAmountEl.textContent = sun;
+    // 沙盒模式：阳光为 MAX_SAFE_INTEGER，显示 ∞
+    this.sunAmountEl.textContent = this.game.sandboxMode ? '∞' : sun;
 
     // 更新卡片可用状态
     const cards = this.plantCardsEl.querySelectorAll('.plant-card');
     cards.forEach(card => {
       const typeId = card.dataset.plantId;
       const type = PLANT_TYPES[typeId];
-      card.classList.toggle('disabled', sun < type.cost || this.isOnCooldown(typeId));
+      // 沙盒模式卡片恒可点（免费无冷却）
+      const disabled = this.game.sandboxMode
+        ? false
+        : (sun < type.cost || this.isOnCooldown(typeId));
+      card.classList.toggle('disabled', disabled);
     });
   }
 
@@ -364,8 +458,10 @@ class UI {
 
   updateWave(info) {
     if (info.endless || info.total === Infinity) {
-      this.waveTextEl.textContent = `第 ${info.current} 波 · 无尽`;
-      // 无尽模式：进度条不显示"总波数"，改为按 1 分钟窗口展示本波进度
+      // 沙盒模式同样用无尽波次，标签区分显示
+      const label = this.sandboxMode ? '沙盒' : '无尽';
+      this.waveTextEl.textContent = `第 ${info.current} 波 · ${label}`;
+      // 进度条不显示"总波数"，恒满
       this.progressFillEl.style.width = '100%';
       return;
     }
@@ -375,7 +471,9 @@ class UI {
 
   updateLevelInfo() {
     if (this.levelInfoEl) {
-      if (this.endlessMode) {
+      if (this.sandboxMode) {
+        this.levelInfoEl.textContent = '模式：🧪 沙盒（无限阳光·全植物·不失败）';
+      } else if (this.endlessMode) {
         this.levelInfoEl.textContent = '模式：♾️ 无尽（无限波次，越打越强）';
       } else {
         const level = LEVELS[this.currentLevel];

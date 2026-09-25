@@ -786,6 +786,92 @@ async function runTests() {
     if (!persistCheck.ok) throw new Error(`静音持久化状态与按钮不一致: ${JSON.stringify(persistCheck)}`);
     await page.evaluate(() => localStorage.removeItem('pvz_muted_v1'));
 
+    // ==========================================
+    // 测试 21: 沙盒模式（无限阳光 + 全植物 + 不失败）
+    // ==========================================
+    console.log('\n📋 测试 21: 沙盒模式');
+    const sandboxResult = await page.evaluate(() => {
+      const g = window.__game;
+      // 1. 启动沙盒
+      g.startLevel(1, false, true);
+      if (!g.sandboxMode) return { ok: false, reason: 'sandboxMode 未置位' };
+      // 2. 阳光应为 MAX_SAFE_INTEGER
+      if (g.sun !== Number.MAX_SAFE_INTEGER) return { ok: false, reason: `沙盒阳光应为 MAX_SAFE_INTEGER, 实际 ${g.sun}` };
+      // 3. 放置任意植物不扣阳光（仍为 MAX）
+      const before = g.sun;
+      g.placePlant('sunflower', 0, 0);
+      if (g.sun !== Number.MAX_SAFE_INTEGER) return { ok: false, reason: '沙盒放置植物后阳光应保持 MAX' };
+      // 4. 僵尸到达房屋不触发失败
+      g.zombies = [];
+      g.spawnZombie('normal', 0);
+      g.zombies[g.zombies.length - 1].x = 0; // 越过房屋线
+      g.zombieReachedHouse(g.zombies[g.zombies.length - 1]); // 内部 sandboxMode 时应直接 return
+      if (g.state !== 'playing') return { ok: false, reason: `沙盒下僵尸到房屋不应失败, 实际 ${g.state}` };
+      // 5. UI 入口
+      const hasBtn = !!document.getElementById('sandbox-btn');
+      return { ok: true, hasBtn };
+    });
+    console.log('  沙盒模式:', JSON.stringify(sandboxResult));
+    if (!sandboxResult.ok) throw new Error(`沙盒模式异常: ${sandboxResult.reason || JSON.stringify(sandboxResult)}`);
+    if (!sandboxResult.hasBtn) throw new Error('沙盒模式按钮不存在!');
+    // 验证 level-info 显示沙盒标签
+    const sandboxUi = await page.evaluate(() => {
+      window.__ui.sandboxMode = true;
+      window.__ui.endlessMode = false;
+      window.__ui.updateLevelInfo();
+      const lvlText = document.getElementById('level-info').textContent;
+      window.__ui.sandboxMode = false;
+      return { lvlText, ok: lvlText.includes('沙盒') };
+    });
+    console.log('  沙盒 UI:', JSON.stringify(sandboxUi));
+    if (!sandboxUi.ok) throw new Error(`沙盒 level-info 应含"沙盒", 实际「${sandboxUi.lvlText}」`);
+    // 恢复普通模式
+    await page.evaluate(() => {
+      window.__game.startLevel(1, false, false);
+    });
+
+    // ==========================================
+    // 测试 22: 存档分享（导出/导入 roundtrip）
+    // ==========================================
+    console.log('\n📋 测试 22: 存档分享');
+    const shareResult = await page.evaluate(() => {
+      // 1. 写入一份已知存档
+      localStorage.setItem('pvz_save_v1', JSON.stringify({
+        totalScore: 1234, totalKills: 56, wins: 7,
+        bestScores: { 1: { score: 100, stars: 3 } },
+      }));
+      // 2. 导出为 base64 串
+      const str = SaveStore.exportSave();
+      if (typeof str !== 'string' || str.length === 0) return { ok: false, reason: 'exportSave 未返回字符串' };
+      // 3. 删除本地存档
+      localStorage.removeItem('pvz_save_v1');
+      if (SaveStore.load()) return { ok: false, reason: '删除后仍有存档' };
+      // 4. 从字符串导入
+      const res = SaveStore.importSave(str);
+      if (!res.ok) return { ok: false, reason: `导入失败: ${res.error}` };
+      const reloaded = SaveStore.load();
+      const okScore = reloaded.totalScore === 1234;
+      const okKills = reloaded.totalKills === 56;
+      const okWins = reloaded.wins === 7;
+      const okBest = reloaded.bestScores && reloaded.bestScores[1] && reloaded.bestScores[1].score === 100;
+      // 5. 校验失败路径
+      const badImport = SaveStore.importSave('!!!not-base64!!!');
+      const emptyImport = SaveStore.importSave('');
+      return {
+        ok: okScore && okKills && okWins && okBest,
+        okScore, okKills, okWins, okBest,
+        badImportRejected: !badImport.ok,
+        emptyImportRejected: !emptyImport.ok,
+        strPreview: str.slice(0, 24),
+      };
+    });
+    console.log('  存档分享:', JSON.stringify(shareResult));
+    if (!shareResult.ok) throw new Error(`存档分享异常: ${shareResult.reason || JSON.stringify(shareResult)}`);
+    if (!shareResult.badImportRejected) throw new Error('非法 base64 串应被拒绝');
+    if (!shareResult.emptyImportRejected) throw new Error('空串应被拒绝');
+    // 清档还原
+    await page.evaluate(() => localStorage.removeItem('pvz_save_v1'));
+
     await page.screenshot({ path: path.join(SHOT_DIR, '14-mobile-scaled.png') });
     console.log('  ✅ 移动端缩放截图已保存: test/screenshots/14-mobile-scaled.png');
 
