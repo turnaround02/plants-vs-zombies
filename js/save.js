@@ -33,14 +33,35 @@ const SaveStore = (() => {
     return s.bestScores[levelId];
   }
 
-  function addClearScore(levelId, score) {
+  function addClearScore(levelId, score, stars) {
     const s = load() || { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
     // 兼容仅含 checkpoints 的存档（如中途保存检查点后通关），缺失字段需初始化，避免 NaN
     s.totalScore = (s.totalScore || 0) + score;
     s.unlockedLevel = Math.max(s.unlockedLevel || 1, Math.min(levelId + 1, Object.keys(LEVELS).length));
     s.bestScores = s.bestScores || {};
-    s.bestScores[levelId] = Math.max(s.bestScores[levelId] || 0, score);
+    const prev = s.bestScores[levelId];
+    const prevScore = typeof prev === 'number' ? prev : (prev?.score || 0);
+    const prevStars = (typeof prev === 'object' && prev.stars) || 0;
+    s.bestScores[levelId] = {
+      score: Math.max(prevScore, score),
+      stars: Math.max(prevStars, stars || 0),
+    };
     localStorage.setItem(KEY, JSON.stringify(s));
+  }
+
+  // 返回某关的最佳（{score, stars}），未通过则 null。
+  // 兼容旧存档：bestScores[levelId] 可能是纯数字（只有 score，无 stars）
+  function bestScore(levelId) {
+    const s = load();
+    const entry = s && s.bestScores && s.bestScores[levelId];
+    if (entry == null) return null;
+    return typeof entry === 'number' ? { score: entry, stars: 0 } : entry;
+  }
+
+  // 返回某关的星级（0-3），未通关返回 0
+  function bestStars(levelId) {
+    const entry = bestScore(levelId);
+    return entry ? (entry.stars || 0) : 0;
   }
 
   function recordWin() {
@@ -84,5 +105,5 @@ const SaveStore = (() => {
     }
   }
 
-  return { load, getProgress, bestScore, addClearScore, recordWin, recordKill, isLevelUnlocked, saveCheckpoint, loadCheckpoint, clearCheckpoint };
+  return { load, getProgress, bestScore, bestStars, addClearScore, recordWin, recordKill, isLevelUnlocked, saveCheckpoint, loadCheckpoint, clearCheckpoint };
 })();

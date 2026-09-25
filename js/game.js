@@ -130,16 +130,15 @@ class Game {
 
     this.gameTime += dt;
 
-    // 天空掉阳光（夜间关卡不掉自然阳光，仅靠植物生产）
+    // 天空掉阳光；夜间关卡掉月亮（🌙，同样 +25 阳光）
     const isNight = this.isNightLevel();
-    if (!isNight) {
-      this.sunFallTimer += dt;
-      if (this.sunFallTimer >= CONFIG.SUN_FALL_INTERVAL) {
-        this.sunFallTimer = 0;
-        const x = CONFIG.GRID_OFFSET_X + 50 + Math.random() * (CONFIG.CANVAS_WIDTH - CONFIG.GRID_OFFSET_X - 100);
-        const y = -20;
-        this.spawnSun(x, y, CONFIG.SUN_FALL_AMOUNT, 'sky');
-      }
+    this.sunFallTimer += dt;
+    if (this.sunFallTimer >= CONFIG.SUN_FALL_INTERVAL) {
+      this.sunFallTimer = 0;
+      const x = CONFIG.GRID_OFFSET_X + 50 + Math.random() * (CONFIG.CANVAS_WIDTH - CONFIG.GRID_OFFSET_X - 100);
+      const y = -20;
+      // 夜间掉月亮而非太阳：收集效果相同（+SUN_FALL_AMOUNT），视觉不同
+      this.spawnSun(x, y, CONFIG.SUN_FALL_AMOUNT, isNight ? 'moon' : 'sky');
     }
 
     // 更新植物
@@ -197,8 +196,8 @@ class Game {
     // 更新阳光
     for (const sun of this.suns) {
       sun.life += dt;
-      // 天空阳光下落
-      if (sun.source === 'sky' && sun.y < sun.targetY) {
+      // 天空/月亮下落
+      if ((sun.source === 'sky' || sun.source === 'moon') && sun.y < sun.targetY) {
         sun.y += 40 * (dt / 1000);
         if (sun.y >= sun.targetY) {
           sun.y = sun.targetY;
@@ -473,6 +472,35 @@ class Game {
   }
 
   renderSun(ctx, sun) {
+    // 月亮（夜间收集物）：蓝色弯月 + 星光，收集效果与太阳相同
+    if (sun.source === 'moon') {
+      const pulse = 1 + Math.sin(sun.life / 300) * 0.1;
+      const r = 14 * pulse;
+      // 光晕
+      ctx.fillStyle = 'rgba(120,180,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(sun.x, sun.y, r + 8, 0, Math.PI * 2);
+      ctx.fill();
+      // 弯月主体：用一个亮圆 + 一个偏移暗圆裁出月牙
+      ctx.save();
+      ctx.fillStyle = '#9fc4ff';
+      ctx.beginPath();
+      ctx.arc(sun.x, sun.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0d1b2a'; // 与夜空背景接近，制造月牙缺口
+      ctx.beginPath();
+      ctx.arc(sun.x + r * 0.55, sun.y - r * 0.25, r * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      // 数字
+      ctx.fillStyle = '#dbe9ff';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sun.amount, sun.x, sun.y + 1);
+      return;
+    }
+
     const pulse = 1 + Math.sin(sun.life / 300) * 0.1;
     const r = 16 * pulse;
 
@@ -849,10 +877,16 @@ class Game {
     this.lastBonus = bonus;
     this.state = 'win';
     Sound.win();
-    SaveStore.addClearScore(this.levelManager.level.id, this.score);
+    const levelId = this.levelManager.level.id;
+    // 星级：按本次通关使用的割草机数量（0-1台→3星，2-3台→2星，4台及以上→1星）
+    const mowersUsed = this.mowers.filter(m => m.spent).length;
+    const stars = mowersUsed <= 1 ? 3 : mowersUsed <= 3 ? 2 : 1;
+    this.lastStars = stars;
+    this.lastMowersUsed = mowersUsed;
+    SaveStore.addClearScore(levelId, this.score, stars);
     SaveStore.recordWin();
     // 通关后清除该关检查点，避免失败屏"从检查点继续"误用旧存档
-    SaveStore.clearCheckpoint(this.levelManager.level.id);
+    SaveStore.clearCheckpoint(levelId);
     this.emitStateChange();
     this.emitScoreChange();
   }

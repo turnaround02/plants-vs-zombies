@@ -167,8 +167,11 @@ class UI {
       btn.className = 'level-btn';
       const unlocked = SaveStore.isLevelUnlocked(id);
       const best = SaveStore.bestScore(id);
-      // 已通关 ✅ + 最佳分（数据存于存档 bestScores，此处为读取展示）
-      const clearedBadge = best != null ? `<span class="level-best">✅ 最佳 ${best}</span>` : '';
+      // 已通关 ✅ + 星级 + 最佳分（数据存于存档 bestScores，此处为读取展示）
+      const starText = best ? '★'.repeat(best.stars || 0) + '☆'.repeat(3 - (best.stars || 0)) : '';
+      const clearedBadge = best
+        ? `<span class="level-best">${starText ? starText + ' ' : ''}✅ 最佳 ${best.score}</span>`
+        : '';
       btn.innerHTML = unlocked
         ? `<span>第 ${id} 关</span><span class="level-name">${level.name}</span>${clearedBadge}`
         : `<span>🔒 第 ${id} 关</span><span class="level-name">${level.name}</span>`;
@@ -253,19 +256,26 @@ class UI {
       this.checkpointBtn.classList.add('hidden');
       const progress = SaveStore.getProgress();
       const best = SaveStore.bestScore(this.currentLevel);
+      const runStars = this.game.lastStars || 0;
+      const runMowers = this.game.lastMowersUsed || 0;
       const stats = `得分 ${this.game.score} · 击杀 ${this.game.kills} · 过关奖励 +${this.game.lastBonus || 0}`;
+      // 本局星级（按割草机使用量）+ 累计统计 + 历史最佳
+      const starBlock = runStars > 0
+        ? `${'★'.repeat(runStars)}${'☆'.repeat(3 - runStars)}（用割草机 ${runMowers} 台）`
+        : '';
       const cumulative = `总胜场 ${progress.wins} · 总击杀 ${progress.totalKills} · 累计得分 ${progress.totalScore}` +
-        (best != null ? `\n本关最佳 ${best}` : '');
+        (best ? `\n历史最佳 ${best.score} 分${best.stars ? ' · ' + '★'.repeat(best.stars) : ''}` : '');
+      const starsPrefix = starBlock ? starBlock + '\n' : '';
       const nextLevel = this.currentLevel + 1;
       const hasMore = nextLevel <= this.totalLevels;
       if (hasMore) {
-        this.resultText.textContent = `成功完成「${levelName}」！\n${stats}\n${cumulative}\n点击下方按钮挑战下一关，或重玩本关。`;
+        this.resultText.textContent = `成功完成「${levelName}」！\n${stats}\n${starsPrefix}${cumulative}\n点击下方按钮挑战下一关，或重玩本关。`;
         this.restartBtn.textContent = '下一关 ▶';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #ff9800, #f57c00)';
         this.restartBtn.title = `挑战第 ${nextLevel} 关`;
         this.currentLevel = nextLevel;
       } else {
-        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n${stats}\n${cumulative}\n你是植物大师！🌟`;
+        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n${stats}\n${starsPrefix}${cumulative}\n你是植物大师！🌟`;
         this.restartBtn.textContent = '再来一局';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
         this.restartBtn.title = '从头开始';
@@ -277,7 +287,7 @@ class UI {
       this.resultTitle.className = 'lose';
       const loseBest = SaveStore.bestScore(this.currentLevel);
       this.resultText.textContent = '僵尸攻破了防线，再试一次吧！' +
-        (loseBest != null ? `\n本关最佳 ${loseBest} 分` : '');
+        (loseBest ? `\n历史最佳 ${loseBest.score} 分` : '');
       this.restartBtn.textContent = '再来一局';
       this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
       this.restartBtn.title = '';

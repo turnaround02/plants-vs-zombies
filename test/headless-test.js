@@ -592,43 +592,96 @@ async function runTests() {
     if (!domTap.gridFilled) throw new Error('坚果墙未成功放置在 0,0');
 
     // ==========================================
-    // 测试 16: 进度显示（最佳分 + 累计统计 + 主页统计）
+    // 测试 16: 进度显示（最佳分 + 星级 + 累计统计 + 主页统计）
     // ==========================================
     console.log('\n📋 测试 16: 进度显示');
     const progressUi = await page.evaluate(() => {
-      // 写入一份存档
+      // 写入一份存档（新格式：bestScores[id] = {score, stars}；同时验证旧数字格式兼容）
       localStorage.setItem('pvz_save_v1', JSON.stringify({
         unlockedLevel: 3, totalScore: 2500, totalKills: 80, wins: 4,
-        bestScores: { 1: 320, 2: 510, 3: 600 },
+        bestScores: { 1: { score: 320, stars: 3 }, 2: 510, 3: { score: 600, stars: 2 } },
       }));
-      // 重建关卡网格并检查徽章
+      // 重建关卡网格并检查徽章（含星级）
       window.__ui.buildLevelGrid();
       const grid = document.getElementById('level-grid');
       const badges = grid.querySelectorAll('.level-best').length;
-      const clearedText = grid.querySelectorAll('.level-best')[0];
-      const clearedContent = clearedText ? clearedText.textContent : '';
+      const badgeTexts = Array.from(grid.querySelectorAll('.level-best')).map(el => el.textContent);
       // 主页累计统计
       window.__ui.updateMenuStats();
       const menuStats = document.getElementById('menu-stats').textContent;
-      // 胜利屏累计统计
+      // 胜利屏累计统计（第2关旧格式 510 → 星级 0）
       window.__ui.currentLevel = 2;
+      window.__game.lastStars = 3;
+      window.__game.lastMowersUsed = 0;
       window.__game.state = 'win';
       window.__game.emitStateChange();
       const resultText = document.getElementById('result-text').textContent;
       return {
         badgeCount: badges,
-        clearedContent,
+        badgeTexts,
         menuStats,
         hasCumulative: resultText.includes('总胜场') && resultText.includes('累计得分'),
-        hasBest: resultText.includes('本关最佳 510'),
+        hasRunStars: resultText.includes('★★★') && resultText.includes('割草机 0 台'),
+        hasBest: resultText.includes('历史最佳 510 分'),
       };
     });
     console.log('  进度 UI:', JSON.stringify(progressUi));
     if (progressUi.badgeCount !== 3) throw new Error(`应有 3 个最佳分徽章(1/2/3关), 实际 ${progressUi.badgeCount}`);
-    if (!progressUi.clearedContent.includes('320')) throw new Error(`第1关徽章应含最佳分 320, 实际「${progressUi.clearedContent}」`);
+    if (!progressUi.badgeTexts[0].includes('★★★') || !progressUi.badgeTexts[0].includes('320')) {
+      throw new Error(`第1关徽章应含 ★★★ 与最佳 320, 实际「${progressUi.badgeTexts[0]}」`);
+    }
+    if (!progressUi.badgeTexts[1].includes('510')) {
+      throw new Error(`第2关旧格式徽章应含 510, 实际「${progressUi.badgeTexts[1]}」`);
+    }
     if (!progressUi.menuStats.includes('总胜场 4')) throw new Error(`主页统计应含总胜场 4, 实际「${progressUi.menuStats}」`);
     if (!progressUi.hasCumulative) throw new Error('胜利屏应显示累计统计');
-    if (!progressUi.hasBest) throw new Error('胜利屏应显示本关最佳 510');
+    if (!progressUi.hasRunStars) throw new Error('胜利屏应显示本局星级 ★★★');
+    if (!progressUi.hasBest) throw new Error('胜利屏应显示历史最佳 510');
+
+    // 测试 17: 星级计算（割草机用量 → 星级）
+    console.log('\n📋 测试 17: 星级计算');
+    const starCalc = await page.evaluate(() => {
+      const g = window.__game;
+      g.startLevel(1);
+      const sim = (mowersUsed) => {
+        localStorage.removeItem('pvz_save_v1'); // 隔离，避免 max 逻辑干扰
+        g.mowers = g._initMowers();
+        for (let i = 0; i < mowersUsed; i++) g.mowers[i].spent = true;
+        g.lastStars = undefined;
+        g.onAllWavesComplete(); // 内部计算并持久化星级
+        const stored = SaveStore.bestStars(1);
+        return { calc: g.lastStars, stored };
+      };
+      const a = sim(0); // 0台 → 3星
+      const b = sim(2); // 2台 → 2星
+      const c = sim(4); // 4台 → 1星
+      return {
+        ok: a.calc === 3 && a.stored === 3 && b.calc === 2 && b.stored === 2 && c.calc === 1 && c.stored === 1,
+        three: a.calc, two: b.calc, one: c.calc,
+      };
+    });
+    console.log('  星级结果:', JSON.stringify(starCalc));
+    if (!starCalc.ok) throw new Error(`星级映射错误: 0台→3星, 2台→2星, 4台→1星, 实际 ${JSON.stringify(starCalc)}`);
+    // 清档还原
+    await page.evaluate(() => localStorage.removeItem('pvz_save_v1'));
+
+    // 测试 18: 夜间月亮收集
+    console.log('\n📋 测试 18: 夜间月亮收集');
+    const moonResult = await page.evaluate(() => {
+      const g = window.__game;
+      g.startLevel(9); // 夜间关
+      g.suns = [];
+      g.sunFallTimer = 0;
+      // 推进到掉月亮
+      for (let i = 0; i < Math.ceil((CONFIG.SUN_FALL_INTERVAL + 100) / 16); i++) g.update(16);
+      const moons = g.suns.filter(s => s.source === 'moon');
+      if (moons.length === 0) return { ok: false, reason: '夜间未生成月亮' };
+      const before = g.sun;
+      g.collectSun(moons[0]);
+      return { ok: g.sun === before + CONFIG.SUN_FALL_AMOUNT, collected: g.sun - before };
+    });
+    console.log('  月亮收集:', JSON.stringify(moonResult));
+    if (!moonResult.ok) throw new Error(`夜间月亮收集异常: ${moonResult.reason || JSON.stringify(moonResult)}`);
 
     // 清档还原，避免污染
     await page.evaluate(() => localStorage.removeItem('pvz_save_v1'));
