@@ -8,3 +8,8 @@ docs/
 godot_project/.godot/
 # Godot 4.x 脚本 uid 缓存
 godot_project/*.uid
+# pnpm build cache
+.pnpm-store/
+# workspace scratch dirs
+tmp/
+zombies/
