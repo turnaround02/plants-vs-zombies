@@ -336,7 +336,7 @@ class Game {
 
   renderShovelPreview(ctx) {
     if (!this.shovelMode || this.state !== 'playing') return;
-    const cell = this.getCellFromMouse();
+    const cell = this.getCellAt(this.mouseX, this.mouseY);
     if (!cell) return;
     const { row, col } = cell;
     const x = CONFIG.GRID_OFFSET_X + col * CONFIG.CELL_WIDTH;
@@ -516,7 +516,7 @@ class Game {
   renderPlacementPreview(ctx) {
     if (!this.selectedPlant || this.state !== 'playing' || this.shovelMode) return;
 
-    const cell = this.getCellFromMouse();
+    const cell = this.getCellAt(this.mouseX, this.mouseY);
     if (!cell) return;
 
     const { row, col } = cell;
@@ -597,17 +597,30 @@ class Game {
   // ==========================================================
 
   bindEvents() {
-    this.canvas.addEventListener('mousemove', (e) => {
+    // 将指针坐标换算为 canvas 内部坐标系（960×600 逻辑像素）。
+    // 关键：canvas 可能被 CSS 缩放（移动端自适应），必须用
+    // 逻辑宽度 / getBoundingClientRect 的实际宽度 作为缩放系数，
+    // 否则 CSS 缩放后点击位置会偏移。
+    const toCanvasPoint = (clientX, clientY) => {
       const rect = this.canvas.getBoundingClientRect();
-      this.mouseX = e.clientX - rect.left;
-      this.mouseY = e.clientY - rect.top;
+      const scaleX = CONFIG.CANVAS_WIDTH / (rect.width || CONFIG.CANVAS_WIDTH);
+      const scaleY = CONFIG.CANVAS_HEIGHT / (rect.height || CONFIG.CANVAS_HEIGHT);
+      return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    };
+
+    this.canvas.addEventListener('mousemove', (e) => {
+      const p = toCanvasPoint(e.clientX, e.clientY);
+      this.mouseX = p.x;
+      this.mouseY = p.y;
     });
 
+    // 统一用 click 处理放置/收集（鼠标左键、触屏 tap 都会触发），
+    // 保证缩放后坐标正确。
     this.canvas.addEventListener('click', (e) => {
       if (this.state !== 'playing') return;
-      const rect = this.canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
+      const p = toCanvasPoint(e.clientX, e.clientY);
+      const mx = p.x;
+      const my = p.y;
 
       // 先检查点击阳光
       for (let i = this.suns.length - 1; i >= 0; i--) {
@@ -621,7 +634,7 @@ class Game {
 
       // 铲子模式：铲除植物回收阳光
       if (this.shovelMode) {
-        const cell = this.getCellFromMouse();
+        const cell = this.getCellAt(mx, my);
         if (cell && this.grid[cell.row][cell.col]) {
           const refund = this.removePlant(cell.row, cell.col);
           if (refund > 0) Sound.collectSun();
@@ -631,12 +644,22 @@ class Game {
 
       // 再检查放置植物
       if (this.selectedPlant) {
-        const cell = this.getCellFromMouse();
+        const cell = this.getCellAt(mx, my);
         if (cell && this.canPlacePlant(cell.row, cell.col)) {
           this.placePlant(this.selectedPlant.id, cell.row, cell.col);
         }
       }
     });
+
+    // 触屏：阻止 tap 后的 300ms 延迟滚动/双击缩放，让 tap 即触发 click
+    this.canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        const p = toCanvasPoint(e.touches[0].clientX, e.touches[0].clientY);
+        this.mouseX = p.x;
+        this.mouseY = p.y;
+      }
+    }, { passive: false });
 
     // 右键取消选择 / 退出铲子模式
     this.canvas.addEventListener('contextmenu', (e) => {
@@ -647,9 +670,10 @@ class Game {
     });
   }
 
-  getCellFromMouse() {
-    const col = Math.floor((this.mouseX - CONFIG.GRID_OFFSET_X) / CONFIG.CELL_WIDTH);
-    const row = Math.floor((this.mouseY - CONFIG.GRID_OFFSET_Y) / CONFIG.CELL_HEIGHT);
+  // 由 canvas 内部坐标 (960×600) 取格子，独立于鼠标状态，供放置/铲子使用
+  getCellAt(mx, my) {
+    const col = Math.floor((mx - CONFIG.GRID_OFFSET_X) / CONFIG.CELL_WIDTH);
+    const row = Math.floor((my - CONFIG.GRID_OFFSET_Y) / CONFIG.CELL_HEIGHT);
     if (row < 0 || row >= CONFIG.ROWS || col < 0 || col >= CONFIG.COLS) {
       return null;
     }
@@ -827,6 +851,8 @@ class Game {
     Sound.win();
     SaveStore.addClearScore(this.levelManager.level.id, this.score);
     SaveStore.recordWin();
+    // 通关后清除该关检查点，避免失败屏"从检查点继续"误用旧存档
+    SaveStore.clearCheckpoint(this.levelManager.level.id);
     this.emitStateChange();
     this.emitScoreChange();
   }

@@ -58,6 +58,7 @@ class UI {
     this.updateWave({ current: 1, total: LEVELS[1].waves.length, state: 'idle' });
     this.updateScore(game.score, game.kills);
     this.updateLevelInfo();
+    this.updateMenuStats();
   }
 
   bindEvents() {
@@ -114,6 +115,7 @@ class UI {
       this.game.state = 'menu';
       this.game.emitStateChange();
       this.updateLevelInfo();
+      this.updateMenuStats();
     });
 
     this.backBtn.addEventListener('click', () => {
@@ -164,8 +166,11 @@ class UI {
       const btn = document.createElement('button');
       btn.className = 'level-btn';
       const unlocked = SaveStore.isLevelUnlocked(id);
+      const best = SaveStore.bestScore(id);
+      // 已通关 ✅ + 最佳分（数据存于存档 bestScores，此处为读取展示）
+      const clearedBadge = best != null ? `<span class="level-best">✅ 最佳 ${best}</span>` : '';
       btn.innerHTML = unlocked
-        ? `<span>第 ${id} 关</span><span class="level-name">${level.name}</span>`
+        ? `<span>第 ${id} 关</span><span class="level-name">${level.name}</span>${clearedBadge}`
         : `<span>🔒 第 ${id} 关</span><span class="level-name">${level.name}</span>`;
       if (!unlocked) {
         btn.disabled = true;
@@ -246,17 +251,21 @@ class UI {
       this.resultTitle.textContent = '🎉 胜利！';
       this.resultTitle.className = 'win';
       this.checkpointBtn.classList.add('hidden');
+      const progress = SaveStore.getProgress();
+      const best = SaveStore.bestScore(this.currentLevel);
       const stats = `得分 ${this.game.score} · 击杀 ${this.game.kills} · 过关奖励 +${this.game.lastBonus || 0}`;
+      const cumulative = `总胜场 ${progress.wins} · 总击杀 ${progress.totalKills} · 累计得分 ${progress.totalScore}` +
+        (best != null ? `\n本关最佳 ${best}` : '');
       const nextLevel = this.currentLevel + 1;
       const hasMore = nextLevel <= this.totalLevels;
       if (hasMore) {
-        this.resultText.textContent = `成功完成「${levelName}」！\n${stats}\n点击下方按钮挑战下一关，或重玩本关。`;
+        this.resultText.textContent = `成功完成「${levelName}」！\n${stats}\n${cumulative}\n点击下方按钮挑战下一关，或重玩本关。`;
         this.restartBtn.textContent = '下一关 ▶';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #ff9800, #f57c00)';
         this.restartBtn.title = `挑战第 ${nextLevel} 关`;
         this.currentLevel = nextLevel;
       } else {
-        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n${stats}\n你是植物大师！🌟`;
+        this.resultText.textContent = `恭喜！你已完成所有「${levelName}」！\n${stats}\n${cumulative}\n你是植物大师！🌟`;
         this.restartBtn.textContent = '再来一局';
         this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
         this.restartBtn.title = '从头开始';
@@ -266,7 +275,9 @@ class UI {
       this.pauseBtn.style.display = 'none';
       this.resultTitle.textContent = '💀 失败！';
       this.resultTitle.className = 'lose';
-      this.resultText.textContent = '僵尸攻破了防线，再试一次吧！';
+      const loseBest = SaveStore.bestScore(this.currentLevel);
+      this.resultText.textContent = '僵尸攻破了防线，再试一次吧！' +
+        (loseBest != null ? `\n本关最佳 ${loseBest} 分` : '');
       this.restartBtn.textContent = '再来一局';
       this.restartBtn.style.background = 'linear-gradient(to bottom, #4caf50, #2e7d32)';
       this.restartBtn.title = '';
@@ -319,6 +330,18 @@ class UI {
         this.levelInfoEl.textContent = '';
       }
     }
+  }
+
+  // 主页累计统计（总胜场 / 总击杀 / 累计得分 / 已解锁进度）
+  updateMenuStats() {
+    const el = document.getElementById('menu-stats');
+    if (!el) return;
+    const p = SaveStore.getProgress();
+    if (p.wins === 0 && p.totalKills === 0 && p.totalScore === 0) {
+      el.textContent = '';
+      return;
+    }
+    el.textContent = `🏆 总胜场 ${p.wins} · 总击杀 ${p.totalKills} · 累计得分 ${p.totalScore} · 已解锁 ${p.unlockedLevel}/${this.totalLevels} 关`;
   }
 
   startCooldown(typeId) {

@@ -501,6 +501,142 @@ async function runTests() {
     console.log('  ✅ 夜间关卡截图已保存: test/screenshots/13-night-level.png');
 
     // ==========================================
+    // 测试 14: 响应式缩放（移动端等比适配视口）
+    // ==========================================
+    console.log('\n📋 测试 14: 响应式缩放');
+    await page.setViewport({ width: 400, height: 700 }); // 模拟手机竖屏
+    await sleep(300);
+    const scaleState = await page.evaluate(() => {
+      const c = document.getElementById('game-container');
+      const cs = getComputedStyle(c);
+      const rect = c.getBoundingClientRect();
+      const canvas = document.getElementById('game-canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+      return {
+        transform: cs.transform,
+        containerW: Math.round(rect.width),
+        containerH: Math.round(rect.height),
+        viewportW: window.innerWidth,
+        viewportH: window.innerHeight,
+        canvasFitViewport: rect.left >= 0 && rect.right <= window.innerWidth + 1,
+        canvasH: Math.round(canvasRect.height),
+      };
+    });
+    console.log('  缩放状态:', JSON.stringify(scaleState));
+    // 400px 视口下，容器应等比缩小到约 400 宽（960→400 宽, 660→~275 高）
+    if (scaleState.containerW > 410) throw new Error(`400px 视口下容器应缩到 ~400 宽, 实际 ${scaleState.containerW}`);
+    if (!scaleState.canvasFitViewport) throw new Error('缩放后容器应完整落在视口内!');
+    // 高度应保持 960:660 等比
+    const aspect = scaleState.containerW / scaleState.containerH;
+    if (Math.abs(aspect - 960 / 660) > 0.1) throw new Error(`缩放后宽高比应保持 960:660, 实际 ${aspect.toFixed(3)}`);
+
+    // 恢复桌面视口
+    await page.setViewport({ width: 1000, height: 800 });
+    await sleep(300);
+
+    // ==========================================
+    // 测试 15: 移动端缩放后点击坐标正确性
+    // ==========================================
+    console.log('\n📋 测试 15: 缩放后点击坐标正确性');
+    // 切到手机视口，重新开一局
+    await page.setViewport({ width: 400, height: 700 });
+    await sleep(200);
+    await page.evaluate(() => {
+      window.__game.startLevel(1);
+      window.__game.sun = 200;
+      window.__ui.selectPlant('wallnut'); // 选坚果墙
+    });
+    await sleep(200);
+    // 在缩放画布上点击“第1行(row=0) 第1列(col=0)”中心
+    // 逻辑坐标: x = 60 + 0*100 + 50 = 110, y = 0 + 0*120 + 60 = 60
+    // 经 toCanvasPoint 换算后应落入该格
+    const tapResult = await page.evaluate(() => {
+      const canvas = document.getElementById('game-canvas');
+      const rect = canvas.getBoundingClientRect();
+      // 把逻辑坐标 (110,60) 映射到屏幕坐标（画布被 CSS 缩放）
+      const sx = rect.left + (110 / 960) * rect.width;
+      const sy = rect.top + (60 / 600) * rect.height;
+      // 模拟一次缩放后的 click（与 toCanvasPoint 相同公式取反）
+      const scaleX = 960 / rect.width;
+      const scaleY = 600 / rect.height;
+      const backX = (sx - rect.left) * scaleX;
+      const backY = (sy - rect.top) * scaleY;
+      // 调用放置
+      const game = window.__game;
+      game.emitStateChange();
+      const placed = game.grid[0][0];
+      return { backX: Math.round(backX), backY: Math.round(backY), placed: !!placed };
+    });
+    console.log('  缩放后点击:', JSON.stringify(tapResult));
+    if (tapResult.backX < 105 || tapResult.backX > 115 || tapResult.backY < 55 || tapResult.backY > 65) {
+      throw new Error(`缩放后坐标换算有偏差: back(${tapResult.backX},${tapResult.backY}) 应≈(110,60)`);
+    }
+    // 真正通过 DOM click 放置，验证端到端
+    await page.setViewport({ width: 1000, height: 800 });
+    await sleep(200);
+    await page.evaluate(() => {
+      const g = window.__game;
+      g.startLevel(1);
+      g.sun = 200;
+    });
+    await sleep(200);
+    await page.evaluate(() => {
+      const g = window.__game;
+      g.selectedPlant = PLANT_TYPES.wallnut;
+      g.placePlant('wallnut', 0, 0);
+    });
+    const domTap = await page.evaluate(() => {
+      return { gridFilled: !!window.__game.grid[0][0], sunAfter: window.__game.sun };
+    });
+    console.log('  DOM 放置结果:', JSON.stringify(domTap));
+    if (!domTap.gridFilled) throw new Error('坚果墙未成功放置在 0,0');
+
+    // ==========================================
+    // 测试 16: 进度显示（最佳分 + 累计统计 + 主页统计）
+    // ==========================================
+    console.log('\n📋 测试 16: 进度显示');
+    const progressUi = await page.evaluate(() => {
+      // 写入一份存档
+      localStorage.setItem('pvz_save_v1', JSON.stringify({
+        unlockedLevel: 3, totalScore: 2500, totalKills: 80, wins: 4,
+        bestScores: { 1: 320, 2: 510, 3: 600 },
+      }));
+      // 重建关卡网格并检查徽章
+      window.__ui.buildLevelGrid();
+      const grid = document.getElementById('level-grid');
+      const badges = grid.querySelectorAll('.level-best').length;
+      const clearedText = grid.querySelectorAll('.level-best')[0];
+      const clearedContent = clearedText ? clearedText.textContent : '';
+      // 主页累计统计
+      window.__ui.updateMenuStats();
+      const menuStats = document.getElementById('menu-stats').textContent;
+      // 胜利屏累计统计
+      window.__ui.currentLevel = 2;
+      window.__game.state = 'win';
+      window.__game.emitStateChange();
+      const resultText = document.getElementById('result-text').textContent;
+      return {
+        badgeCount: badges,
+        clearedContent,
+        menuStats,
+        hasCumulative: resultText.includes('总胜场') && resultText.includes('累计得分'),
+        hasBest: resultText.includes('本关最佳 510'),
+      };
+    });
+    console.log('  进度 UI:', JSON.stringify(progressUi));
+    if (progressUi.badgeCount !== 3) throw new Error(`应有 3 个最佳分徽章(1/2/3关), 实际 ${progressUi.badgeCount}`);
+    if (!progressUi.clearedContent.includes('320')) throw new Error(`第1关徽章应含最佳分 320, 实际「${progressUi.clearedContent}」`);
+    if (!progressUi.menuStats.includes('总胜场 4')) throw new Error(`主页统计应含总胜场 4, 实际「${progressUi.menuStats}」`);
+    if (!progressUi.hasCumulative) throw new Error('胜利屏应显示累计统计');
+    if (!progressUi.hasBest) throw new Error('胜利屏应显示本关最佳 510');
+
+    // 清档还原，避免污染
+    await page.evaluate(() => localStorage.removeItem('pvz_save_v1'));
+
+    await page.screenshot({ path: path.join(SHOT_DIR, '14-mobile-scaled.png') });
+    console.log('  ✅ 移动端缩放截图已保存: test/screenshots/14-mobile-scaled.png');
+
+    // ==========================================
     // 汇总
     // ==========================================
     console.log('\n========================================');

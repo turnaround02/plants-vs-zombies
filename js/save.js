@@ -16,13 +16,21 @@ const SaveStore = (() => {
 
   function getProgress() {
     const s = load();
-    if (!s) return { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0 };
+    if (!s) return { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
     return {
       unlockedLevel: s.unlockedLevel || 1,
       totalScore: s.totalScore || 0,
       totalKills: s.totalKills || 0,
       wins: s.wins || 0,
+      bestScores: s.bestScores || {},
     };
+  }
+
+  // 返回某关的最佳分（未通过则 null）
+  function bestScore(levelId) {
+    const s = load();
+    if (!s || !s.bestScores || s.bestScores[levelId] == null) return null;
+    return s.bestScores[levelId];
   }
 
   function addClearScore(levelId, score) {
@@ -76,5 +84,5 @@ const SaveStore = (() => {
     }
   }
 
-  return { load, getProgress, addClearScore, recordWin, recordKill, isLevelUnlocked, saveCheckpoint, loadCheckpoint, clearCheckpoint };
+  return { load, getProgress, bestScore, addClearScore, recordWin, recordKill, isLevelUnlocked, saveCheckpoint, loadCheckpoint, clearCheckpoint };
 })();

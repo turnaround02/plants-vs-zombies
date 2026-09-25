@@ -42,6 +42,32 @@
       requestAnimationFrame(gameLoop);
     }
 
+    // 响应式缩放：将 960×660 的 #game-container 等比缩放到适配视口
+    // （桌面端不超过 1.0，窄屏/手机按比例缩小）；canvas 内坐标换算在
+    // game.bindEvents 的 toCanvasPoint 里用 getBoundingClientRect 动态感知。
+    // 关键：绝对定位 + transform 缩放不会改变布局，不影响坐标换算；
+    // 桌面端 scale=1 时行为与原先的 flex 居中一致。
+    function fitContainer() {
+      const container = document.getElementById('game-container');
+      if (!container) return;
+      const W = 960, H = 660; // 与 CSS 中 #game-container 固定尺寸一致
+      const margin = 8;
+      const scale = Math.min(
+        (window.innerWidth - margin * 2) / W,
+        (window.innerHeight - margin * 2) / H,
+        1,
+      );
+      const s = Math.max(scale, 0.25);
+      container.style.position = 'absolute';
+      container.style.left = '50%';
+      container.style.top = '50%';
+      container.style.transform = `translate(-50%, -50%) scale(${s})`;
+      container.style.transformOrigin = 'center center';
+    }
+    window.addEventListener('resize', fitContainer);
+    window.addEventListener('orientationchange', fitContainer);
+    fitContainer();
+
     // 启动主循环
     requestAnimationFrame(gameLoop);
 
