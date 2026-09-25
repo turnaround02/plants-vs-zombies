@@ -165,6 +165,7 @@ class UI {
       const level = LEVELS[id];
       const btn = document.createElement('button');
       btn.className = 'level-btn';
+      // 全关卡默认解锁（不再需要通关解锁）：isLevelUnlocked 恒为 true
       const unlocked = SaveStore.isLevelUnlocked(id);
       const best = SaveStore.bestScore(id);
       // 已通关 ✅ + 星级 + 最佳分（数据存于存档 bestScores，此处为读取展示）
@@ -342,16 +343,16 @@ class UI {
     }
   }
 
-  // 主页累计统计（总胜场 / 总击杀 / 累计得分 / 已解锁进度）
+  // 主页累计统计（总胜场 / 总击杀 / 累计得分）
   updateMenuStats() {
     const el = document.getElementById('menu-stats');
     if (!el) return;
     const p = SaveStore.getProgress();
     if (p.wins === 0 && p.totalKills === 0 && p.totalScore === 0) {
-      el.textContent = '';
+      el.textContent = '🌻 全部关卡已解锁，随时挑战！';
       return;
     }
-    el.textContent = `🏆 总胜场 ${p.wins} · 总击杀 ${p.totalKills} · 累计得分 ${p.totalScore} · 已解锁 ${p.unlockedLevel}/${this.totalLevels} 关`;
+    el.textContent = `🏆 总胜场 ${p.wins} · 总击杀 ${p.totalKills} · 累计得分 ${p.totalScore}`;
   }
 
   startCooldown(typeId) {

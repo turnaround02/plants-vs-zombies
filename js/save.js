@@ -14,11 +14,14 @@ const SaveStore = (() => {
     }
   }
 
+  // 关卡解锁已改为"全部默认解锁"（不再需要通关解锁），
+  // getProgress 始终返回总关卡数作为 unlockedLevel，仅用于展示。
   function getProgress() {
+    const totalLevels = Object.keys(LEVELS).length;
     const s = load();
-    if (!s) return { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
+    if (!s) return { unlockedLevel: totalLevels, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
     return {
-      unlockedLevel: s.unlockedLevel || 1,
+      unlockedLevel: totalLevels,
       totalScore: s.totalScore || 0,
       totalKills: s.totalKills || 0,
       wins: s.wins || 0,
@@ -34,10 +37,12 @@ const SaveStore = (() => {
   }
 
   function addClearScore(levelId, score, stars) {
-    const s = load() || { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
+    const totalLevels = Object.keys(LEVELS).length;
+    const s = load() || { unlockedLevel: totalLevels, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
     // 兼容仅含 checkpoints 的存档（如中途保存检查点后通关），缺失字段需初始化，避免 NaN
     s.totalScore = (s.totalScore || 0) + score;
-    s.unlockedLevel = Math.max(s.unlockedLevel || 1, Math.min(levelId + 1, Object.keys(LEVELS).length));
+    // 全关卡默认解锁：仍写入 unlockedLevel（保持存档格式向后兼容），但值恒为总关卡数
+    s.unlockedLevel = totalLevels;
     s.bestScores = s.bestScores || {};
     const prev = s.bestScores[levelId];
     const prevScore = typeof prev === 'number' ? prev : (prev?.score || 0);

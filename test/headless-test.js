@@ -601,11 +601,17 @@ async function runTests() {
         unlockedLevel: 3, totalScore: 2500, totalKills: 80, wins: 4,
         bestScores: { 1: { score: 320, stars: 3 }, 2: 510, 3: { score: 600, stars: 2 } },
       }));
+      // 全关卡默认解锁：getProgress 应恒返回 totalLevels，与存档中的 unlockedLevel 无关
+      const totalLevels = Object.keys(LEVELS).length;
+      const progressUnlocked = SaveStore.getProgress().unlockedLevel;
+      const allUnlocked = Array.from({ length: totalLevels }, (_, i) => i + 1)
+        .every(id => SaveStore.isLevelUnlocked(id));
       // 重建关卡网格并检查徽章（含星级）
       window.__ui.buildLevelGrid();
       const grid = document.getElementById('level-grid');
       const badges = grid.querySelectorAll('.level-best').length;
       const badgeTexts = Array.from(grid.querySelectorAll('.level-best')).map(el => el.textContent);
+      const lockedCount = grid.querySelectorAll('.level-btn.locked').length;
       // 主页累计统计
       window.__ui.updateMenuStats();
       const menuStats = document.getElementById('menu-stats').textContent;
@@ -617,6 +623,7 @@ async function runTests() {
       window.__game.emitStateChange();
       const resultText = document.getElementById('result-text').textContent;
       return {
+        progressUnlocked, totalLevels, allUnlocked, lockedCount,
         badgeCount: badges,
         badgeTexts,
         menuStats,
@@ -626,6 +633,11 @@ async function runTests() {
       };
     });
     console.log('  进度 UI:', JSON.stringify(progressUi));
+    if (progressUi.progressUnlocked !== progressUi.totalLevels) {
+      throw new Error(`全关卡默认解锁下 getProgress().unlockedLevel 应=${progressUi.totalLevels}, 实际 ${progressUi.progressUnlocked}`);
+    }
+    if (!progressUi.allUnlocked) throw new Error('所有关卡应默认解锁');
+    if (progressUi.lockedCount !== 0) throw new Error(`关卡网格不应有锁定按钮, 实际 ${progressUi.lockedCount} 个`);
     if (progressUi.badgeCount !== 3) throw new Error(`应有 3 个最佳分徽章(1/2/3关), 实际 ${progressUi.badgeCount}`);
     if (!progressUi.badgeTexts[0].includes('★★★') || !progressUi.badgeTexts[0].includes('320')) {
       throw new Error(`第1关徽章应含 ★★★ 与最佳 320, 实际「${progressUi.badgeTexts[0]}」`);

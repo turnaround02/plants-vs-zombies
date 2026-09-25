@@ -886,8 +886,11 @@ func _save_progress() -> void:
 
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
+		# 全关卡默认解锁：unlocked_level 恒为总关卡数（字段保留仅为向后兼容旧存档/读取端）
+		var _lv = get_node_or_null("/root/Levels")
+		var total_levels: int = _lv.all_ids().size() if _lv else 9
 		var data := {
-			"unlocked_level": max(old_unlocked, current_level_id + 1),
+			"unlocked_level": total_levels,
 			"total_score": old_total_score + score,
 			"total_kills": old_total_kills + kills,
 			"wins": old_wins + 1,

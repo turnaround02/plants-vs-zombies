@@ -13,10 +13,9 @@ func _on_button_pressed() -> void:
     emit_signal("start_pressed")
     queue_free()
 
-## 关卡选择面板：已解锁可选，未解锁置灰；已通关显示 ★ 与最佳分（与浏览器版 buildLevelGrid 对齐）
+## 关卡选择面板：全部关卡默认解锁（无需通关解锁）；已通关显示 ★ 与最佳分（与浏览器版 buildLevelGrid 对齐）
 func _build_level_select() -> void:
     var progress := _load_progress_full()
-    _unlocked_level = int(progress.get("unlocked_level", 1))
     var best_scores: Dictionary = progress.get("best_scores", {})
     var panel := Panel.new()
     panel.name = "LevelSelectPanel"
@@ -29,6 +28,8 @@ func _build_level_select() -> void:
     panel.add_child(title)
     var _lv = get_node_or_null("/root/Levels")
     var _total: int = _lv.all_ids().size() if _lv else 0
+    # 全关卡默认解锁：_unlocked_level 恒为总关卡数（存档 unlocked_level 字段仅为向后兼容保留）
+    _unlocked_level = _total
     for i in range(1, _total + 1):
         var btn := Button.new()
         var best: Dictionary = best_scores.get(i, {})
@@ -42,6 +43,7 @@ func _build_level_select() -> void:
         var col_idx: int = (i - 1) % 3
         btn.position = Vector2(20 + col_idx * 90, 50 + row_idx * 50)
         btn.custom_minimum_size = Vector2(80, 40)
+        # 全关卡默认解锁：所有按钮可点（locked 恒为 false，保留字段以便未来恢复进度门控）
         var locked: bool = i > _unlocked_level
         btn.disabled = locked
         btn.modulate = Color(0.5, 0.5, 0.5, 1.0) if locked else Color(1.0, 1.0, 1.0, 1.0)
