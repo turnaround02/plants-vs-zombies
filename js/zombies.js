@@ -151,10 +151,13 @@ class Zombie {
     const wobble = Math.sin(this.walkPhase) * 3;
     ctx.save();
     ctx.translate(x, y + wobble);
-    // 普通僵尸向左(已翻转)，被魅惑的僵尸向右(再翻转回来显示正脸)
-    ctx.scale(this.isAlly ? 1 : -1, 1);
-    // 优先精灵图，失败回退矢量
-    if (!this._drawSprite(ctx)) {
+    // 精灵图(sprites/*.png)本身朝左：普通僵尸不翻(朝左)、盟友翻(朝右)。
+    // 矢量回退旧图朝右：普通僵尸翻成朝左、盟友不翻。两者翻转逻辑相反。
+    if (this._spriteReady()) {
+      ctx.scale(this.isAlly ? -1 : 1, 1);   // sprite: 盟友翻转、普通不翻
+      this._drawSprite(ctx);
+    } else {
+      ctx.scale(this.isAlly ? 1 : -1, 1);    // vector: 普通翻转、盟友不翻
       this.renderBody(ctx, 0, 0);
     }
     ctx.restore();
@@ -198,6 +201,11 @@ class Zombie {
       ctx.ellipse(x, y, 22, 32, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
+  }
+
+  _spriteReady() {
+    const key = 'zombie:' + this.typeId;
+    return (typeof SpriteLoader !== 'undefined') && SpriteLoader.isReady(key);
   }
 
   _drawSprite(ctx) {
