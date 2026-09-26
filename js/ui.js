@@ -88,9 +88,8 @@ class UI {
     this.updateLevelInfo();
     this.updateMenuStats();
 
-    // 问题3修复：初始加载时手动套用一次 menu 态，隐藏 HUD 玩法元素与暂停按钮
-    // （构造期不会 emit，否则 #pause-btn 会因 CSS 默认 display 残留在首页）
-    this.applyMenuHudVisibility();
+    // 初始可见性同步（顶栏玩法控件只在非暂停游玩态可见；menu 态 showPlay=false → 隐藏）
+    this.syncTopBarVisibility();
   }
 
   bindEvents() {
@@ -148,20 +147,23 @@ class UI {
       }
     });
 
+    // 顶栏暂停按钮：单向"仅暂停"（modal 感知，绝不兼做恢复）
     this.pauseBtn.addEventListener('click', () => {
       Sound.click();
-      this.togglePause();
+      this.pauseGame();
     });
 
+    // 暂停菜单"继续游戏"：单向"仅恢复"
     this.resumeBtn.addEventListener('click', () => {
       Sound.click();
-      this.togglePause();
+      this.resumeGame();
     });
 
     this.restartPauseBtn.addEventListener('click', () => {
       Sound.click();
       this.closeLevelSelect();
-      this.togglePause();
+      // 先解除暂停离开暂停态，再开新局（startLevel 本身也会重置 isPaused）
+      this.resumeGame();
       // 暂停菜单"重新开始"：保留当前模式；重开同模式需重建卡片条
       this.game.startLevel(this.currentLevel, this.endlessMode, this.sandboxMode);
       this.buildPlantCards();
@@ -175,7 +177,8 @@ class UI {
     this.mainMenuBtn.addEventListener('click', () => {
       Sound.click();
       this.closeLevelSelect();
-      this.togglePause();
+      // 先解除暂停离开暂停态，再切回主页
+      this.resumeGame();
       this.currentLevel = 1;
       this.endlessMode = false;
       this.sandboxMode = false;
@@ -191,22 +194,54 @@ class UI {
     });
   }
 
-  togglePause() {
-    if (this.game.state !== 'playing') return;
-    this.isPaused = !this.isPaused;
-    this.game.isPaused = this.isPaused;
-    if (this.isPaused) {
-      this.pauseOverlay.classList.remove('hidden');
-    } else {
-      this.pauseOverlay.classList.add('hidden');
-      this.closeLevelSelect();
-    }
+  // 单向"仅暂停"：顶栏 #pause-btn 调用。只有游玩且未暂停时生效
+  pauseGame() {
+    if (this.game.state !== 'playing' || this.isPaused) return;
+    this.isPaused = true;
+    this.game.isPaused = true;
+    this.pauseOverlay.classList.remove('hidden');
+    document.getElementById('pause-menu').classList.remove('hidden');
+    document.getElementById('level-select').classList.add('hidden');
+    this.syncTopBarVisibility();
+  }
+
+  // 单向"仅恢复"：暂停菜单 #resume-btn / 重新开始 / 返回主页 调用。只有暂停中才生效
+  resumeGame() {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    this.game.isPaused = false;
+    this.pauseOverlay.classList.add('hidden');
+    this.closeLevelSelect();
+    this.syncTopBarVisibility();
+  }
+
+  // ============================================================
+  // 顶栏玩法控件可见性（单一事实来源）
+  // 设计规则：顶栏玩法控件只在 (state==='playing' 且 未暂停 且
+  // 未打开暂停/选植物面板) 时可见可用；其它状态一律隐藏，仅保留静音按钮（全局）
+  // ============================================================
+  syncTopBarVisibility() {
+    const pauseOverlayVisible = !this.pauseOverlay.classList.contains('hidden');
+    const plantPickOverlayVisible = !this.plantPickOverlay.classList.contains('hidden');
+    const showPlay =
+      this.game.state === 'playing' &&
+      !this.isPaused &&
+      !pauseOverlayVisible &&
+      !plantPickOverlayVisible;
+    const d = showPlay ? '' : 'none';
+    this.plantCardsEl.style.display = d;
+    this.shovelBtn.style.display = d;
+    this.waveInfoEl.style.display = d;
+    this.scoreInfoEl.style.display = d;
+    this.pauseBtn.style.display = d;
+    // #mute-btn 全局常驻，不在此处处理
   }
 
   bindShovel() {
     this.shovelBtn.addEventListener('click', () => {
       Sound.click();
       if (this.game.state !== 'playing') return;
+      if (this.isPaused) return; // 暂停中铲子无意义（防御：面板/暂停菜单下按钮已隐藏，此处双保险）
       // 与植物选择互斥
       this.game.shovelMode = !this.game.shovelMode;
       if (this.game.shovelMode) this.game.selectedPlant = null;
@@ -300,11 +335,13 @@ class UI {
     document.getElementById('pause-menu').classList.add('hidden');
     document.getElementById('level-select').classList.remove('hidden');
     this.buildLevelGrid(); // 每次打开时读取最新存档，刷新解锁状态
+    this.syncTopBarVisibility();
   }
 
   closeLevelSelect() {
     document.getElementById('pause-menu').classList.remove('hidden');
     document.getElementById('level-select').classList.add('hidden');
+    this.syncTopBarVisibility();
   }
 
   // 读档：从 localStorage 读取上次选择的开局植物（无则用默认搭配）
@@ -357,6 +394,7 @@ class UI {
         this.closeLevelSelect();
         this.pauseOverlay.classList.add('hidden');
         this.openPlantPicker({ endless: false, sandbox: false, levelId: this.currentLevel });
+        this.syncTopBarVisibility(); // 面板顶栏同步（防御：emitStateChange 路径也覆盖）
       });
       this.levelGrid.appendChild(btn);
     }
@@ -403,6 +441,7 @@ class UI {
     this.plantPickOverlay.classList.remove('hidden');
     this.buildPlantPickGrid();
     this._refreshPlantPickUi();
+    this.syncTopBarVisibility(); // 面板下顶栏玩法控件全部隐藏
   }
 
   // 渲染 11 张可勾选植物卡
@@ -463,6 +502,7 @@ class UI {
     this._pickerFromPause = false;
     // 游戏内卡片条只渲染所选植物（沙盒显示全部）
     this.buildPlantCards();
+    this.syncTopBarVisibility();
   }
 
   // 绑定开局选植物面板事件
@@ -486,6 +526,7 @@ class UI {
         this.menuOverlay.classList.remove('hidden');
       }
       this._pendingStart = null;
+      this.syncTopBarVisibility();
     });
   }
 
@@ -514,6 +555,8 @@ class UI {
   selectPlant(typeId) {
     const type = PLANT_TYPES[typeId];
     if (this.game.state !== 'playing') return;
+    if (this.isPaused) return; // 暂停中卡片条已隐藏（防御双保险）
+    if (!this.plantPickOverlay.classList.contains('hidden')) return; // 选植物面板打开时卡片条已隐藏（防御双保险）
     // 沙盒模式：植物免费且无冷却（sun 为 MAX_SAFE_INTEGER，cost 检查恒通过；跳过冷却）
     if (this.game.sun < type.cost) return;
     if (!this.game.sandboxMode && this.isOnCooldown(typeId)) return;
@@ -535,20 +578,7 @@ class UI {
     return cd.remaining > 0;
   }
 
-  // 供构造期与"返回主页"复用；进入倒数/游玩时由 handleStateChange 恢复显示
-  applyMenuHudVisibility() {
-    const hide = this.game.state === 'menu';
-    this.plantCardsEl.style.display = hide ? 'none' : '';
-    this.shovelBtn.style.display = hide ? 'none' : '';
-    this.waveInfoEl.style.display = hide ? 'none' : '';
-    this.scoreInfoEl.style.display = hide ? 'none' : '';
-    this.pauseBtn.style.display = this.game.state === 'playing' ? '' : 'none';
-  }
-
   handleStateChange(data) {
-    // 问题1&3：首页（menu 态）隐藏玩法 HUD（植物卡片/铲子/波次/得分/暂停按钮）
-    this.applyMenuHudVisibility();
-
     // 沙盒模式：body 加/去 sandbox-mode 类（CSS 据此允许卡片条横向滚动）
     document.body.classList.toggle('sandbox-mode', this.game.sandboxMode);
 
@@ -573,22 +603,22 @@ class UI {
       this.countdownNumberEl.textContent = Math.ceil(this.game.countdown) || 'GO';
     }
 
-    // 问题1&3：首页（menu）时隐藏整个 HUD 玩法元素（植物卡片/铲子/波次/得分/暂停按钮），
-    // 仅保留静音按钮；进入倒数/游玩才显示。结算屏也隐藏暂停按钮。
-    const inPlay = data.state === 'playing' || data.state === 'countdown';
-    const hideHudPlay = !inPlay; // menu/win/lose 时隐藏玩法 HUD
-    this.plantCardsEl.style.display = hideHudPlay ? 'none' : '';
-    this.shovelBtn.style.display = hideHudPlay ? 'none' : '';
-    this.waveInfoEl.style.display = hideHudPlay ? 'none' : '';
-    this.scoreInfoEl.style.display = hideHudPlay ? 'none' : '';
-    this.pauseBtn.style.display = data.state === 'playing' ? '' : 'none';
+    // 顶栏玩法控件可见性由 syncTopBarVisibility 统一管理（menu/win/lose/countdown/暂停/面板下隐藏）
 
     // 暂停菜单仅在"暂停中且游玩"时显示；结算/首页/倒数时隐藏
     const pauseHidden = data.state !== 'playing' || !this.isPaused;
     this.pauseOverlay.classList.toggle('hidden', pauseHidden);
+    // 选植物面板优先：面板可见时强制隐藏暂停菜单（防止铲子等 emitStateChange 把暂停菜单重新顶到面板上）
+    if (!this.plantPickOverlay.classList.contains('hidden')) {
+      this.pauseOverlay.classList.add('hidden');
+    }
+    // 结算/结束态：两个模态面板都应收起
+    if (data.state === 'win' || data.state === 'lose') {
+      this.plantPickOverlay.classList.add('hidden');
+      this.pauseOverlay.classList.add('hidden');
+    }
 
     if (data.state === 'win') {
-      this.pauseBtn.style.display = 'none';
       const levelName = LEVELS[this.currentLevel] ? LEVELS[this.currentLevel].name : '关卡';
       this.resultTitle.textContent = '🎉 胜利！';
       this.resultTitle.className = 'win';
@@ -621,7 +651,6 @@ class UI {
         this.currentLevel = 1;
       }
     } else if (data.state === 'lose') {
-      this.pauseBtn.style.display = 'none';
       this.resultTitle.textContent = '💀 失败！';
       this.resultTitle.className = 'lose';
       const loseBest = SaveStore.bestScore(this.currentLevel);
@@ -646,6 +675,9 @@ class UI {
     if (data.state === 'playing' && data.selectedPlant === null) {
       // 检查是否有刚放置的植物(通过 sun 变化检测)
     }
+
+    // 顶栏玩法控件可见性同步（单一事实来源，须在所有覆盖层/标志更新后调用）
+    this.syncTopBarVisibility();
   }
 
   updateSun(sun) {
