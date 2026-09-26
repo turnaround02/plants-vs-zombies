@@ -10,6 +10,7 @@ class UI {
     this.sandboxMode = false; // 沙盒模式标志（无限阳光、全植物、不失败）
     this.totalLevels = Object.keys(LEVELS).length;
     this.isPaused = false;
+    this._pickerFromPause = false; // 选植物面板是否从"暂停菜单→选关卡"进入（返回时恢复暂停）
 
     // DOM 元素
     this.sunAmountEl = document.getElementById('sun-amount');
@@ -348,11 +349,11 @@ class UI {
         this.endlessMode = false; // 选关卡 = 普通模式
         this.sandboxMode = false;
         this.updateLevelInfo();
-        // 问题5修复：选关卡 = 退出暂停菜单 + 重开该关（含 3-2-1 倒数）
-        // 必须清 isPaused 并隐藏暂停菜单，否则 startLevel 后 handleStateChange
-        // 因 isPaused 仍为 true 会把暂停菜单重新顶出来（停在暂停页）
-        this.isPaused = false;
-        this.game.isPaused = false;
+        // 选关卡进入选植物面板：旧关卡保持暂停（冻结僵尸），隐藏暂停菜单、显示面板。
+        // 只在 _commitStart（点"开始战斗"）时才解除暂停开新局；"返回"则恢复暂停菜单。
+        this._pickerFromPause = true;
+        this.isPaused = true;
+        this.game.isPaused = true;
         this.closeLevelSelect();
         this.pauseOverlay.classList.add('hidden');
         this.openPlantPicker({ endless: false, sandbox: false, levelId: this.currentLevel });
@@ -456,6 +457,10 @@ class UI {
     this.sandboxMode = !!pending.sandbox;
     this.updateLevelInfo();
     this.game.startLevel(pending.levelId, !!pending.endless, !!pending.sandbox);
+    // 确认开新局：解除"选关卡时保留的暂停"，避免 handleStateChange 把暂停菜单顶回来（原"问题5"）
+    this.isPaused = false;
+    this.game.isPaused = false;
+    this._pickerFromPause = false;
     // 游戏内卡片条只渲染所选植物（沙盒显示全部）
     this.buildPlantCards();
   }
@@ -469,7 +474,17 @@ class UI {
     this.plantPickBackBtn.addEventListener('click', () => {
       Sound.click();
       this.plantPickOverlay.classList.add('hidden');
-      if (this.game.state === 'menu') this.menuOverlay.classList.remove('hidden');
+      if (this._pickerFromPause) {
+        // 从暂停菜单"选关卡"进入：返回应回到暂停菜单，旧关卡保持暂停
+        this.isPaused = true;
+        this.game.isPaused = true;
+        this.pauseOverlay.classList.remove('hidden');
+        this.openLevelSelect(); // 回到关卡选择网格（仍在暂停菜单下）
+        this._pickerFromPause = false;
+      } else if (this.game.state === 'menu') {
+        // 从首页进入：返回回首页菜单
+        this.menuOverlay.classList.remove('hidden');
+      }
       this._pendingStart = null;
     });
   }
