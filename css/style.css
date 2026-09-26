@@ -70,14 +70,19 @@ body {
 
 #plant-cards {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
-  overflow-x: auto;
+  overflow: hidden;
+}
+
+/* 沙盒模式（11 张卡片可能溢出）允许横向滚动，普通模式保持隐藏 */
+body.sandbox-mode #plant-cards {
+  overflow: auto;
 }
 
 .plant-card {
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   border-radius: 8px;
   background: linear-gradient(to bottom, #f5e6c8, #d4b483);
   border: 2px solid #8b5a2b;

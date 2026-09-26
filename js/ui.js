@@ -534,6 +534,9 @@ class UI {
     // 问题1&3：首页（menu 态）隐藏玩法 HUD（植物卡片/铲子/波次/得分/暂停按钮）
     this.applyMenuHudVisibility();
 
+    // 沙盒模式：body 加/去 sandbox-mode 类（CSS 据此允许卡片条横向滚动）
+    document.body.classList.toggle('sandbox-mode', this.game.sandboxMode);
+
     // 更新卡片选中状态
     const cards = this.plantCardsEl.querySelectorAll('.plant-card');
     cards.forEach(card => {
