@@ -199,6 +199,7 @@ class UI {
     if (this.game.state !== 'playing' || this.isPaused) return;
     this.isPaused = true;
     this.game.isPaused = true;
+    this.clearShareHint();
     this.pauseOverlay.classList.remove('hidden');
     document.getElementById('pause-menu').classList.remove('hidden');
     document.getElementById('level-select').classList.add('hidden');
@@ -210,6 +211,7 @@ class UI {
     if (!this.isPaused) return;
     this.isPaused = false;
     this.game.isPaused = false;
+    this.clearShareHint();
     this.pauseOverlay.classList.add('hidden');
     this.closeLevelSelect();
     this.syncTopBarVisibility();
@@ -322,6 +324,14 @@ class UI {
     }
   }
 
+  // 重置分享提示（#share-hint）：清空文案/错误色并隐藏，
+  // 避免上次"复制/导入存档"的提示在重新打开暂停菜单时残留
+  clearShareHint() {
+    if (!this.shareHintEl) return;
+    this.shareHintEl.className = '';
+    this.shareHintEl.classList.add('hidden');
+  }
+
   updateMuteBtn() {
     if (!this.muteBtn) return;
     const muted = !Sound.isEnabled();
@@ -331,6 +341,7 @@ class UI {
   }
 
   openLevelSelect() {
+    this.clearShareHint();
     this.pauseOverlay.classList.remove('hidden');
     document.getElementById('pause-menu').classList.add('hidden');
     document.getElementById('level-select').classList.remove('hidden');
@@ -339,6 +350,7 @@ class UI {
   }
 
   closeLevelSelect() {
+    this.clearShareHint();
     document.getElementById('pause-menu').classList.remove('hidden');
     document.getElementById('level-select').classList.add('hidden');
     this.syncTopBarVisibility();
@@ -365,7 +377,7 @@ class UI {
       const level = LEVELS[id];
       const btn = document.createElement('button');
       btn.className = 'level-btn';
-      // 全关卡默认解锁（不再需要通关解锁）：isLevelUnlocked 恒为 true
+      // 解锁状态来自存档（通关 N 解锁 N+1）；未解锁关卡显示 🔒 并禁用
       const unlocked = SaveStore.isLevelUnlocked(id);
       const best = SaveStore.bestScore(id);
       // 已通关 ✅ + 星级 + 最佳分（数据存于存档 bestScores，此处为读取展示）
@@ -737,11 +749,12 @@ class UI {
     const el = document.getElementById('menu-stats');
     if (!el) return;
     const p = SaveStore.getProgress();
+    const totalLevels = Object.keys(LEVELS).length;
     if (p.wins === 0 && p.totalKills === 0 && p.totalScore === 0) {
-      el.textContent = '🌻 全部关卡已解锁，随时挑战！';
+      el.textContent = `已解锁 ${p.unlockedLevel}/${totalLevels} 关 · 🌻 通关解锁更多关卡`;
       return;
     }
-    el.textContent = `🏆 总胜场 ${p.wins} · 总击杀 ${p.totalKills} · 累计得分 ${p.totalScore}`;
+    el.textContent = `🏆 总胜场 ${p.wins} · 总击杀 ${p.totalKills} · 累计得分 ${p.totalScore} · 已解锁 ${p.unlockedLevel}/${totalLevels} 关`;
   }
 
   startCooldown(typeId) {

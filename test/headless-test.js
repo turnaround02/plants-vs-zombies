@@ -620,7 +620,7 @@ async function runTests() {
         unlockedLevel: 3, totalScore: 2500, totalKills: 80, wins: 4,
         bestScores: { 1: { score: 320, stars: 3 }, 2: 510, 3: { score: 600, stars: 2 } },
       }));
-      // 全关卡默认解锁：getProgress 应恒返回 totalLevels，与存档中的 unlockedLevel 无关
+      // 解锁进度来自存档：getProgress 返回存档中真实的 unlockedLevel（seeded = 3）
       const totalLevels = Object.keys(LEVELS).length;
       const progressUnlocked = SaveStore.getProgress().unlockedLevel;
       const allUnlocked = Array.from({ length: totalLevels }, (_, i) => i + 1)
@@ -654,11 +654,13 @@ async function runTests() {
       };
     });
     console.log('  进度 UI:', JSON.stringify(progressUi));
-    if (progressUi.progressUnlocked !== progressUi.totalLevels) {
-      throw new Error(`全关卡默认解锁下 getProgress().unlockedLevel 应=${progressUi.totalLevels}, 实际 ${progressUi.progressUnlocked}`);
+    if (progressUi.progressUnlocked !== 3) {
+      throw new Error(`存档 unlockedLevel=3 时 getProgress().unlockedLevel 应=3, 实际 ${progressUi.progressUnlocked}`);
     }
-    if (!progressUi.allUnlocked) throw new Error('所有关卡应默认解锁');
-    if (progressUi.lockedCount !== 0) throw new Error(`关卡网格不应有锁定按钮, 实际 ${progressUi.lockedCount} 个`);
+    if (progressUi.allUnlocked) throw new Error('未解锁全部关卡时 allUnlocked 应为 false');
+    if (progressUi.lockedCount !== progressUi.totalLevels - 3) {
+      throw new Error(`关卡 4-${progressUi.totalLevels} 应被锁定, 锁定数应为 ${progressUi.totalLevels - 3}, 实际 ${progressUi.lockedCount}`);
+    }
     if (progressUi.badgeCount !== 3) throw new Error(`应有 3 个最佳分徽章(1/2/3关), 实际 ${progressUi.badgeCount}`);
     if (!progressUi.badgeTexts[0].includes('★★★') || !progressUi.badgeTexts[0].includes('320')) {
       throw new Error(`第1关徽章应含 ★★★ 与最佳 320, 实际「${progressUi.badgeTexts[0]}」`);

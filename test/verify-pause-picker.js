@@ -210,6 +210,12 @@ async function run() {
       if (ui.chosenPlantIds.length === 0) {
         ui.chosenPlantIds.push('sunflower', 'peashooter');
       }
+      // 解锁进度门禁（通关 N 解锁 N+1）：localStorage.clear 后第 2 关锁定，
+      // 需先写入存档解锁进度，关卡按钮才可点（与旧"全关卡默认解锁"行为的差异点）
+      const save = JSON.parse(localStorage.getItem('pvz_save_v1') || 'null') || {};
+      save.unlockedLevel = 2;
+      localStorage.setItem('pvz_save_v1', JSON.stringify(save));
+      window.__ui.buildLevelGrid(); // 重新读档刷新解锁状态（关卡按钮可点的前提）
       // 走真实的"暂停菜单→选关卡"路径：点关卡网格里的"第 2 关"按钮
       const btn = Array.from(document.querySelectorAll('#level-grid .level-btn'))
         .find(b => b.querySelector('span') && b.querySelector('span').textContent === '第 2 关');

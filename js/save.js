@@ -14,14 +14,13 @@ const SaveStore = (() => {
     }
   }
 
-  // 关卡解锁已改为"全部默认解锁"（不再需要通关解锁），
-  // getProgress 始终返回总关卡数作为 unlockedLevel，仅用于展示。
+  // 关卡解锁进度：通关第 N 关解锁第 N+1 关，unlockedLevel 持久化在存档中，
+  // 刷新页面后不会重置（存档自动保存）
   function getProgress() {
-    const totalLevels = Object.keys(LEVELS).length;
     const s = load();
-    if (!s) return { unlockedLevel: totalLevels, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
+    if (!s) return { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
     return {
-      unlockedLevel: totalLevels,
+      unlockedLevel: s.unlockedLevel || 1,
       totalScore: s.totalScore || 0,
       totalKills: s.totalKills || 0,
       wins: s.wins || 0,
@@ -38,11 +37,11 @@ const SaveStore = (() => {
 
   function addClearScore(levelId, score, stars) {
     const totalLevels = Object.keys(LEVELS).length;
-    const s = load() || { unlockedLevel: totalLevels, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
+    const s = load() || { unlockedLevel: 1, totalScore: 0, totalKills: 0, wins: 0, bestScores: {} };
     // 兼容仅含 checkpoints 的存档（如中途保存检查点后通关），缺失字段需初始化，避免 NaN
     s.totalScore = (s.totalScore || 0) + score;
-    // 全关卡默认解锁：仍写入 unlockedLevel（保持存档格式向后兼容），但值恒为总关卡数
-    s.unlockedLevel = totalLevels;
+    // 通关第 N 关解锁第 N+1 关（最后一关封顶为总关卡数）
+    s.unlockedLevel = Math.min(Math.max(s.unlockedLevel || 1, levelId + 1), totalLevels);
     s.bestScores = s.bestScores || {};
     const prev = s.bestScores[levelId];
     const prevScore = typeof prev === 'number' ? prev : (prev?.score || 0);
@@ -118,7 +117,7 @@ const SaveStore = (() => {
   // 用 encodeURIComponent 包裹以正确编码中文（如关卡名/未来扩展字段）
   function exportSave() {
     const s = load() || {
-      unlockedLevel: Object.keys(LEVELS).length,
+      unlockedLevel: 1,
       totalScore: 0, totalKills: 0, wins: 0, bestScores: {},
     };
     return btoa(unescape(encodeURIComponent(JSON.stringify(s))));
@@ -145,7 +144,7 @@ const SaveStore = (() => {
       return { ok: false, error: 'shape' };
     }
     const cleaned = {
-      unlockedLevel: Object.keys(LEVELS).length,
+      unlockedLevel: Math.min(Math.max(Number(data.unlockedLevel) || 1, 1), Object.keys(LEVELS).length),
       totalScore: Number(data.totalScore) || 0,
       totalKills: Number(data.totalKills) || 0,
       wins: Number(data.wins) || 0,
