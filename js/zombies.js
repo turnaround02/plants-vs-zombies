@@ -153,7 +153,10 @@ class Zombie {
     ctx.translate(x, y + wobble);
     // 普通僵尸向左(已翻转)，被魅惑的僵尸向右(再翻转回来显示正脸)
     ctx.scale(this.isAlly ? 1 : -1, 1);
-    this.renderBody(ctx, 0, 0);
+    // 优先精灵图，失败回退矢量
+    if (!this._drawSprite(ctx)) {
+      this.renderBody(ctx, 0, 0);
+    }
     ctx.restore();
 
     // 血条(常驻)
@@ -195,6 +198,18 @@ class Zombie {
       ctx.ellipse(x, y, 22, 32, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
+  }
+
+  _drawSprite(ctx) {
+    const key = 'zombie:' + this.typeId;
+    if (typeof SpriteLoader === 'undefined' || !SpriteLoader.isReady(key)) return false;
+    const img = SpriteLoader.get(key);
+    if (!img || !img.complete) return false;
+    const w = CONFIG.CELL_WIDTH;   // 100
+    const h = CONFIG.CELL_HEIGHT;  // 120
+    // 绘制在已 translate+scale 的局部坐标系中，居中 (0,0)
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    return true;
   }
 
   renderBody(ctx, x, y) {

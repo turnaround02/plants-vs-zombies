@@ -136,6 +136,13 @@ class Plant {
     ctx.ellipse(x, y + 30, 22, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // 优先用 PNG 精灵图绘制（加载成功后替代矢量绘制；失败则回退矢量）
+    if (this._drawSprite(ctx)) {
+      // 精灵图绘制成功：仍需画血条，然后 return（跳过矢量绘制）
+      this._drawHpBar(ctx);
+      return;
+    }
+    // 回退：原有矢量绘制
     // 根据行为绘制不同植物
     switch (this.type.behavior) {
       case 'sunProducer':
@@ -166,16 +173,33 @@ class Plant {
     }
 
     // 血条(常驻)
-    {
-      const barW = 40;
-      const barH = 5;
-      const barX = x - barW / 2;
-      const barY = y - 38;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(barX, barY, barW, barH);
-      ctx.fillStyle = this.hp / this.maxHp > 0.5 ? '#4caf50' : '#f44336';
-      ctx.fillRect(barX, barY, barW * (this.hp / this.maxHp), barH);
-    }
+    this._drawHpBar(ctx);
+  }
+
+  _drawSprite(ctx) {
+    const key = 'plant:' + this.typeId;
+    if (typeof SpriteLoader === 'undefined' || !SpriteLoader.isReady(key)) return false;
+    const img = SpriteLoader.get(key);
+    if (!img || !img.complete) return false;
+    const { x, y } = this;
+    const bob = this.bobOffset;
+    // 精灵图按格子 1:1 (100x120) 绘制，居中到 (x, y)，头顶留血条空间
+    const w = CONFIG.CELL_WIDTH;     // 100
+    const h = CONFIG.CELL_HEIGHT;    // 120
+    ctx.drawImage(img, x - w / 2, y - h / 2 + bob, w, h);
+    return true;
+  }
+
+  _drawHpBar(ctx) {
+    const { x, y } = this;
+    const barW = 40;
+    const barH = 5;
+    const barX = x - barW / 2;
+    const barY = y - 38;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = this.hp / this.maxHp > 0.5 ? '#4caf50' : '#f44336';
+    ctx.fillRect(barX, barY, barW * (this.hp / this.maxHp), barH);
   }
 
   renderSunflower(ctx, x, y) {

@@ -13,6 +13,9 @@
       return;
     }
 
+    // 预加载植物/僵尸精灵图（加载失败时自动回退矢量绘制）
+    SpriteLoader.preload();
+
     // 创建游戏实例
     const game = new Game(canvas);
     const ui = new UI(game);

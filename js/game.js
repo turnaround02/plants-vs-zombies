@@ -590,7 +590,16 @@ class Game {
     ctx.font = '36px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(this.selectedPlant.icon, x + CONFIG.CELL_WIDTH / 2, y + CONFIG.CELL_HEIGHT / 2);
+    if (typeof SpriteLoader !== 'undefined' && SpriteLoader.isReady('plant:' + this.selectedPlant.id)) {
+      // 精灵图就绪：按格子 0.6 倍缩放，居中绘制
+      const img = SpriteLoader.get('plant:' + this.selectedPlant.id);
+      const s = 0.6;
+      const cw = CONFIG.CELL_WIDTH * s;
+      const ch = CONFIG.CELL_HEIGHT * s;
+      ctx.drawImage(img, x + CONFIG.CELL_WIDTH / 2 - cw / 2, y + CONFIG.CELL_HEIGHT / 2 - ch / 2, cw, ch);
+    } else {
+      ctx.fillText(this.selectedPlant.icon, x + CONFIG.CELL_WIDTH / 2, y + CONFIG.CELL_HEIGHT / 2);
+    }
     ctx.globalAlpha = 1;
   }
 
